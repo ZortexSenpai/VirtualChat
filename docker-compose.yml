@@ -1,60 +1,24 @@
 services:
   virtualchat:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      args:
-        # Vite bakes VITE_* vars in at build time, not runtime.
-        # Pulled from .env (or the shell), falls back to empty.
-        VITE_KLIPY_API_KEY: ${VITE_KLIPY_API_KEY:-}
-        VITE_DEFAULT_HOMESERVER: ${VITE_DEFAULT_HOMESERVER:-}
-        VITE_LOCK_HOMESERVER: ${VITE_LOCK_HOMESERVER:-}
-    image: virtualchat:latest
+    image: ghcr.io/zortexsenpai/virtualchat:latest
     container_name: virtualchat
     restart: unless-stopped
-    # When fronted by Traefik, drop the `ports` block and let Traefik
-    # reach the container over the shared network instead.
     ports:
-      - "8080:80"
+      - 8080:80
     networks:
-      - default
-      # - proxy  # uncomment when using Traefik (see networks block below)
+      - frontend
+    environment:
+      - VITE_KLIPY_API_KEY=${VITE_LOCK_HOMESERVER}
+      - VITE_DEFAULT_HOMESERVER=${VITE_LOCK_HOMESERVER}
+      - VITE_LOCK_HOMESERVER=${VITE_LOCK_HOMESERVER}
     labels:
-      # --- Traefik -------------------------------------------------------
-      # Set VIRTUALCHAT_HOST in .env (e.g. chat.example.com) and make sure
-      # your Traefik instance is attached to the `proxy` network below.
       - "traefik.enable=true"
-      - "traefik.docker.network=proxy"
-
-      # HTTP router — redirect to HTTPS
-      - "traefik.http.routers.virtualchat.rule=Host(`${VIRTUALCHAT_HOST:-virtualchat.localhost}`)"
-      - "traefik.http.routers.virtualchat.entrypoints=web"
-      - "traefik.http.routers.virtualchat.middlewares=virtualchat-https-redirect"
-      - "traefik.http.middlewares.virtualchat-https-redirect.redirectscheme.scheme=https"
-
-      # HTTPS router
-      - "traefik.http.routers.virtualchat-secure.rule=Host(`${VIRTUALCHAT_HOST:-virtualchat.localhost}`)"
-      - "traefik.http.routers.virtualchat-secure.entrypoints=websecure"
-      - "traefik.http.routers.virtualchat-secure.tls=true"
-      - "traefik.http.routers.virtualchat-secure.tls.certresolver=letsencrypt"
-      - "traefik.http.routers.virtualchat-secure.service=virtualchat"
-
-      # Service — nginx listens on :80 inside the container
+      - "traefik.docker.network=frontend"
+      - "traefik.http.routers.virtualchat.rule=Host(`virtualchat.example.com`)"
+      - "traefik.http.routers.virtualchat.entrypoints=websecure"
+      - "traefik.http.routers.virtualchat.tls.certresolver=letsencrypt"
       - "traefik.http.services.virtualchat.loadbalancer.server.port=80"
 
-      # Security headers (tweak CSP to taste — Matrix needs connect-src to
-      # your homeserver(s), media-src for mxc uploads, etc.)
-      - "traefik.http.routers.virtualchat-secure.middlewares=virtualchat-headers"
-      - "traefik.http.middlewares.virtualchat-headers.headers.stsSeconds=31536000"
-      - "traefik.http.middlewares.virtualchat-headers.headers.stsIncludeSubdomains=true"
-      - "traefik.http.middlewares.virtualchat-headers.headers.stsPreload=true"
-      - "traefik.http.middlewares.virtualchat-headers.headers.contentTypeNosniff=true"
-      - "traefik.http.middlewares.virtualchat-headers.headers.browserXssFilter=true"
-      - "traefik.http.middlewares.virtualchat-headers.headers.referrerPolicy=strict-origin-when-cross-origin"
-
 networks:
-  default:
-  # External network shared with your Traefik instance. Create once with:
-  #   docker network create proxy
-  proxy:
+  frontend:
     external: true
