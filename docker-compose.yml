@@ -8,8 +8,8 @@ services:
     networks:
       - frontend
     environment:
-      - VITE_KLIPY_API_KEY=${VITE_LOCK_HOMESERVER}
-      - VITE_DEFAULT_HOMESERVER=${VITE_LOCK_HOMESERVER}
+      - VITE_KLIPY_API_KEY=${VITE_KLIPY_API_KEY}
+      - VITE_DEFAULT_HOMESERVER=${VITE_DEFAULT_HOMESERVER}
       - VITE_LOCK_HOMESERVER=${VITE_LOCK_HOMESERVER}
     labels:
       - "traefik.enable=true"
