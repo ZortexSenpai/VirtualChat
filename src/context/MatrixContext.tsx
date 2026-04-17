@@ -797,6 +797,19 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
       },
     )
 
+    // Own sends: Room.timeline fires once with status=SENDING for the local echo
+    // (filtered above), then handleRemoteEcho updates the event in place without
+    // re-emitting Timeline. Without this listener, our own messages would only
+    // appear after a reload or room switch forces a timeline re-read.
+    client.on(RoomEvent.LocalEchoUpdated, (event: MatrixEvent, room: Room) => {
+      if (event.status !== null) return
+      const t = event.getType()
+      if (t !== EventType.RoomMessage && t !== EventType.Sticker && t !== 'm.poll.start' && t !== 'org.matrix.msc3381.poll.start') return
+      if (event.getContent()['m.relates_to']?.rel_type === 'm.replace') return
+      dispatch({ type: 'APPEND_MESSAGE', message: event, roomId: room.roomId })
+      refreshRooms()
+    })
+
     client.on(RoomEvent.Name, () => refreshRooms())
     client.on(RoomEvent.MyMembership, () => refreshRooms())
 
