@@ -2,13 +2,14 @@ import React, { useEffect, useState } from 'react'
 import { createClient } from 'matrix-js-sdk'
 import { useMatrix } from '../context/MatrixContext'
 import { useTranslation } from '../services/i18n'
+import { runtimeConfig } from '../runtimeConfig'
 
 interface LoginProps {
   ssoError?: string | null
 }
 
-const DEFAULT_HOMESERVER = (import.meta.env.VITE_DEFAULT_HOMESERVER ?? '').trim()
-const LOCK_HOMESERVER = /^(1|true|yes)$/i.test(String(import.meta.env.VITE_LOCK_HOMESERVER ?? ''))
+const DEFAULT_HOMESERVER = runtimeConfig.DEFAULT_HOMESERVER
+const LOCK_HOMESERVER = /^(1|true|yes)$/i.test(runtimeConfig.LOCK_HOMESERVER)
 
 export default function Login({ ssoError }: LoginProps) {
   const { t } = useTranslation()

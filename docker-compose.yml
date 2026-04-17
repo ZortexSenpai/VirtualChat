@@ -8,9 +8,9 @@ services:
     networks:
       - frontend
     environment:
-      - VITE_KLIPY_API_KEY=${VITE_KLIPY_API_KEY}
-      - VITE_DEFAULT_HOMESERVER=${VITE_DEFAULT_HOMESERVER}
-      - VITE_LOCK_HOMESERVER=${VITE_LOCK_HOMESERVER}
+      - KLIPY_API_KEY=${VITE_KLIPY_API_KEY:-}
+      - DEFAULT_HOMESERVER=${VITE_DEFAULT_HOMESERVER:-}
+      - LOCK_HOMESERVER=${VITE_LOCK_HOMESERVER:-}
     labels:
       - "traefik.enable=true"
       - "traefik.docker.network=frontend"

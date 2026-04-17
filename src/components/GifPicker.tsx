@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react'
 import { useMatrix } from '../context/MatrixContext'
 import type { StickerPack } from '../context/MatrixContext'
+import { runtimeConfig } from '../runtimeConfig'
 
-const API_KEY = (import.meta as any).env?.VITE_KLIPY_API_KEY as string | undefined
+const API_KEY = runtimeConfig.KLIPY_API_KEY || undefined
 const KLIPY_BASE = 'https://api.klipy.com/api/v1'
 
 interface KlipyFile {

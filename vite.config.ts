@@ -27,6 +27,7 @@ export default defineConfig({
       ],
       workbox: {
         globPatterns: ['**/*.{js,css,html,svg,png,ico,woff,woff2}'],
+        globIgnores: ['**/config.js'],
         navigateFallback: '/index.html',
         // Matrix homeserver requests are cross-origin and should always go to
         // the network; the SW only caches the app shell.
