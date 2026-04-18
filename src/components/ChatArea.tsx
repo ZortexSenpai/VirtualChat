@@ -597,6 +597,19 @@ function dismissKey(eventId: string, url: string): string {
   return `vc_preview_dismissed:${eventId}|${url}`
 }
 
+// The homeserver's URL preview returns OpenGraph metadata verbatim, so og:url
+// may contain a javascript:/data: URL that would execute on click. Only accept
+// http(s) and fall back to the already-validated source URL otherwise.
+function safeHttpUrl(raw: string | undefined, fallback: string): string {
+  if (!raw) return fallback
+  try {
+    const u = new URL(raw, fallback)
+    return u.protocol === 'http:' || u.protocol === 'https:' ? u.toString() : fallback
+  } catch {
+    return fallback
+  }
+}
+
 function LinkPreview({ url, client, ts, eventId }: { url: string; client: any; ts: number; eventId: string }) {
   const isDirectImage = IMAGE_EXT_RE.test(url)
   const [preview, setPreview] = useState<any>(null)
@@ -664,7 +677,7 @@ function LinkPreview({ url, client, ts, eventId }: { url: string; client: any; t
   const description = preview['og:description'] as string | undefined
   const imageUrl = preview['og:image'] as string | undefined
   const siteName = preview['og:site_name'] as string | undefined
-  const linkUrl = (preview['og:url'] as string | undefined) ?? url
+  const linkUrl = safeHttpUrl(preview['og:url'] as string | undefined, url)
 
   if (!title && !description && !imageUrl) return null
 
