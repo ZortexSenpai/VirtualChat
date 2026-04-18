@@ -132,11 +132,14 @@ function AppContent() {
     return () => window.removeEventListener('keydown', onKey)
   }, [isMobile, mobileDrawerOpen, mobileMemberDrawerOpen])
 
-  // Handle SSO redirect callback: ?loginToken=<token>&homeserver=<hs>
+  // Handle SSO redirect callback: ?loginToken=<token>
+  // The homeserver is only read from localStorage (set at SSO initiation);
+  // trusting a URL-supplied homeserver would let an attacker redirect the
+  // loginToken exchange to a server they control.
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     const token = params.get('loginToken')
-    const homeserver = params.get('homeserver') ?? localStorage.getItem('mx_sso_homeserver')
+    const homeserver = localStorage.getItem('mx_sso_homeserver')
     if (!token || !homeserver) return
 
     setSsoLoading(true)
