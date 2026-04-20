@@ -556,9 +556,15 @@ function substituteEmotes(
 
 /** Build ReactMarkdown `components` overrides that substitute emotes in text-bearing elements. */
 function emoteMarkdownComponents(emoteMap: Record<string, RoomEmote>, client: any) {
-  if (Object.keys(emoteMap).length === 0) return undefined
-  const sub = (children: React.ReactNode) => substituteEmotes(children, emoteMap, client)
+  const hasEmotes = Object.keys(emoteMap).length > 0
+  const sub = hasEmotes
+    ? (children: React.ReactNode) => substituteEmotes(children, emoteMap, client)
+    : (children: React.ReactNode) => children
   return {
+    // Open external links in a new tab with safe rel attrs.
+    a: ({ children, href, ...rest }: any) => (
+      <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>{children}</a>
+    ),
     p: ({ children }: any) => <p>{sub(children)}</p>,
     strong: ({ children }: any) => <strong>{sub(children)}</strong>,
     em: ({ children }: any) => <em>{sub(children)}</em>,
@@ -1176,6 +1182,14 @@ function MessageContent({ event, client }: { event: MatrixEvent; client: any }) 
   }
   // Preserve single newlines as hard breaks — markdown otherwise collapses them.
   bodyText = bodyText.replace(/(?<!\n)\n(?!\n)/g, '  \n')
+  // Auto-link bare http(s) URLs by wrapping them in angle brackets so ReactMarkdown
+  // renders them as clickable links. Skip URLs already inside markdown link syntax
+  // (preceded by `(`) or an angle bracket (preceded by `<`).
+  bodyText = bodyText.replace(/(^|[^\w(<])(https?:\/\/[^\s<>)]+)/g, (_m, pre, url) => {
+    const trail = url.match(/[.,;:!?)\]]+$/)?.[0] ?? ''
+    const clean = trail ? url.slice(0, -trail.length) : url
+    return `${pre}<${clean}>${trail}`
+  })
 
   const previewUrls = extractPreviewUrls(bodyText)
 

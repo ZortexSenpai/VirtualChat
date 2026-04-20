@@ -6,6 +6,7 @@ import MxcAvatar, { useMxcBlobUrl } from './MxcAvatar'
 import RoomContextMenu from './RoomContextMenu'
 import RoomSettingsModal from './RoomSettingsModal'
 import RoomDirectory from './RoomDirectory'
+import SpaceLobby from './SpaceLobby'
 import { isVoiceChannel } from '../services/roomKind'
 import { useTranslation } from '../services/i18n'
 
@@ -436,6 +437,7 @@ export default function ChannelSidebar() {
   const [showCreateRoom, setShowCreateRoom] = useState(false)
   const [showJoinRoom, setShowJoinRoom] = useState(false)
   const [showDirectory, setShowDirectory] = useState(false)
+  const [showSpaceLobby, setShowSpaceLobby] = useState(false)
   const [pinnedRoomIds, setPinnedRoomIds] = useState<Set<string>>(loadPinnedRooms)
 
   function togglePin(roomId: string) {
@@ -550,18 +552,31 @@ export default function ChannelSidebar() {
           })()}
 
           {channels.length === 0 && dms.length === 0 ? (
-            <p className="no-rooms-hint">
-              {state.syncState === 'PREPARED' || state.syncState === 'SYNCING'
-                ? t('sidebar.noRoomsFound')
-                : t('sidebar.loadingRooms')}
-            </p>
+            <>
+              <p className="no-rooms-hint">
+                {state.syncState === 'PREPARED' || state.syncState === 'SYNCING'
+                  ? t('sidebar.noRoomsFound')
+                  : t('sidebar.loadingRooms')}
+              </p>
+              {state.activeSpaceId !== null && (
+                <button className="explore-rooms-btn" onClick={() => setShowSpaceLobby(true)}>
+                  <ExploreIcon />
+                  <span>Browse channels in this space</span>
+                </button>
+              )}
+            </>
           ) : (
             <>
               {channels.length > 0 && (
                 <>
                   <div className="channel-section-header">
                     {t('sidebar.channels')}
-                    <button className="channel-section-add-btn" onClick={() => setShowDirectory(true)} title={t('sidebar.explorePublic')}><ExploreIcon /></button>
+                    {state.activeSpaceId !== null && (
+                      <button className="channel-section-add-btn" onClick={() => setShowSpaceLobby(true)} title="Browse channels in this space"><ExploreIcon /></button>
+                    )}
+                    {state.activeSpaceId === null && (
+                      <button className="channel-section-add-btn" onClick={() => setShowDirectory(true)} title={t('sidebar.explorePublic')}><ExploreIcon /></button>
+                    )}
                     <button className="channel-section-add-btn" onClick={() => setShowJoinRoom(true)} title={t('sidebar.joinByAddress')}><JoinIcon /></button>
                     <button className="channel-section-add-btn" onClick={() => setShowCreateRoom(true)} title={t('sidebar.createRoom')}><PlusIcon /></button>
                   </div>
@@ -675,6 +690,9 @@ export default function ChannelSidebar() {
       {showCreateRoom && <CreateRoomModal onClose={() => setShowCreateRoom(false)} />}
       {showJoinRoom && <JoinRoomModal onClose={() => setShowJoinRoom(false)} />}
       {showDirectory && <RoomDirectory onClose={() => setShowDirectory(false)} />}
+      {showSpaceLobby && state.activeSpaceId && (
+        <SpaceLobby spaceId={state.activeSpaceId} onClose={() => setShowSpaceLobby(false)} />
+      )}
     </>
   )
 }

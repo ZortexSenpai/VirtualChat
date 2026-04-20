@@ -1,2 +1,3 @@
-
-- threads are not rendered correctly
+- available channels in space are not shown -> there is some kind of "lobby" missing like in cinny
+- bot accounts not listed in member view
+- links not clickable in text messages

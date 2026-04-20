@@ -182,14 +182,18 @@ export default function MemberList() {
     }
   }, [client, roomId])
 
-  // Prefer the context's SET_MEMBERS list when it has meaningful data (loaded
-  // via click-to-switch path) — it uses real RoomMember objects with richer
-  // presence data. Otherwise fall back to the locally-fetched list which is
-  // guaranteed to populate on reload.
-  const contextMembers = state.members.length > 0 && state.activeRoomId === lastRoomIdRef.current
-    ? toDisplayMembers(state.members)
-    : null
-  const members = contextMembers ?? localMembers
+  // Merge both sources: the server-authoritative localMembers (from /joined_members)
+  // always includes bots and app-service ghost users, while the SDK's context
+  // members carry richer state. Start from localMembers so no one is dropped,
+  // then overlay context entries for overlapping userIds.
+  const members = React.useMemo(() => {
+    const byId = new Map<string, DisplayMember>()
+    for (const m of localMembers) byId.set(m.userId, m)
+    if (state.members.length > 0 && state.activeRoomId === lastRoomIdRef.current) {
+      for (const m of toDisplayMembers(state.members)) byId.set(m.userId, m)
+    }
+    return Array.from(byId.values())
+  }, [localMembers, state.members, state.activeRoomId])
 
   if (!roomId) return null
 
