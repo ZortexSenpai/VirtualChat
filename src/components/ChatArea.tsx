@@ -2278,14 +2278,27 @@ export default function ChatArea({
     ?.getContent()?.topic ?? ''
 
   const ignoredSet = React.useMemo(() => new Set(state.ignoredUserIds), [state.ignoredUserIds])
+  const [showDeletedMessages, setShowDeletedMessages] = useState(
+    () => localStorage.getItem('vc_show_deleted_messages') !== 'false',
+  )
+  // Pick up toggle changes from SettingsModal without requiring a reload.
+  useEffect(() => {
+    function onChange() {
+      setShowDeletedMessages(localStorage.getItem('vc_show_deleted_messages') !== 'false')
+    }
+    window.addEventListener('vc:settings-changed', onChange)
+    return () => window.removeEventListener('vc:settings-changed', onChange)
+  }, [])
   const visibleMessages = React.useMemo(() => (
     state.messages.filter(m => {
       if (ignoredSet.has(m.getSender() ?? '')) return false
       // Hide thread replies from the main chat — they belong in the thread panel.
       if (m.getContent()['m.relates_to']?.rel_type === 'm.thread') return false
+      // Hide redacted messages entirely when the user has opted out of the placeholder.
+      if (!showDeletedMessages && m.isRedacted()) return false
       return true
     })
-  ), [state.messages, ignoredSet])
+  ), [state.messages, ignoredSet, showDeletedMessages])
   const groups = React.useMemo(
     () => groupMessages(visibleMessages, client, activeRoom),
     [visibleMessages, client, activeRoom]

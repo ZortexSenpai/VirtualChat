@@ -189,6 +189,8 @@ const en: Record<string, string> = {
   'settings.privacy.profileChangesDesc': 'Show when someone changes their display name or avatar.',
   'settings.privacy.roomChangesLabel': 'Room name & topic changes',
   'settings.privacy.roomChangesDesc': 'Show when the room name or topic is updated.',
+  'settings.privacy.deletedMessagesLabel': 'Deleted messages',
+  'settings.privacy.deletedMessagesDesc': 'Show a placeholder for messages that have been deleted. Turn off to hide them entirely.',
 
   // Settings — Expert
   'settings.expert.accessTokenSection': 'Access Token',

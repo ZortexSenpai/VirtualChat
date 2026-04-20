@@ -1954,10 +1954,13 @@ function PrivacyTab() {
   const [showLeave, setShowLeave] = useState(() => localStorage.getItem('vc_show_member_leave') !== 'false')
   const [showProfile, setShowProfile] = useState(() => localStorage.getItem('vc_show_profile_change') !== 'false')
   const [showRoom, setShowRoom] = useState(() => localStorage.getItem('vc_show_room_change') !== 'false')
+  const [showDeleted, setShowDeleted] = useState(() => localStorage.getItem('vc_show_deleted_messages') !== 'false')
 
   function toggle(key: string, val: boolean, setter: (v: boolean) => void) {
     setter(val)
     localStorage.setItem(key, String(val))
+    // Notify listeners in the same tab — the native `storage` event only fires for other tabs.
+    window.dispatchEvent(new CustomEvent('vc:settings-changed', { detail: { key } }))
   }
 
   const toggleRows = [
@@ -1970,6 +1973,7 @@ function PrivacyTab() {
     { key: 'vc_show_member_leave',    label: t('settings.privacy.memberLeavesLabel'),   desc: t('settings.privacy.memberLeavesDesc'),   val: showLeave,   set: setShowLeave },
     { key: 'vc_show_profile_change',  label: t('settings.privacy.profileChangesLabel'), desc: t('settings.privacy.profileChangesDesc'), val: showProfile, set: setShowProfile },
     { key: 'vc_show_room_change',     label: t('settings.privacy.roomChangesLabel'),    desc: t('settings.privacy.roomChangesDesc'),    val: showRoom,    set: setShowRoom },
+    { key: 'vc_show_deleted_messages', label: t('settings.privacy.deletedMessagesLabel'), desc: t('settings.privacy.deletedMessagesDesc'), val: showDeleted, set: setShowDeleted },
   ]
 
   return (

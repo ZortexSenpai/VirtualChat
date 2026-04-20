@@ -455,7 +455,10 @@ export default function ChannelSidebar() {
     : null
   const spaceName = activeSpace ? activeSpace.name ?? 'Space' : 'Home'
 
-  const channels = state.activeSpaceId !== null ? state.rooms : []
+  // state.rooms is already filtered correctly by MatrixContext: in Home view it
+  // contains all non-space, non-DM joined rooms (so group chats show up here);
+  // inside a space it contains that space's child channels.
+  const channels = state.rooms
   const dms = state.activeSpaceId === null ? state.directRooms : []
 
   function openContextMenu(e: React.MouseEvent, room: Room) {

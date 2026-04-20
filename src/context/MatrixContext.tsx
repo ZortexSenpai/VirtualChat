@@ -595,16 +595,44 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
     const directIds = getDirectRoomIds(client)
     dispatch({ type: 'SET_DIRECT_ROOMS', rooms: allRooms.filter(r => !r.isSpaceRoom() && directIds.has(r.roomId) && r.getMyMembership() === 'join') })
 
+    // Collect every room that is a child of any space so we can exclude them
+    // from Home (Home should only surface unaffiliated rooms).
+    const spaceChildIds = new Set<string>()
+    for (const s of spaces) {
+      const events = s.currentState.getStateEvents(EventType.SpaceChild as string)
+      const list = Array.isArray(events) ? events : [events]
+      for (const ev of list) {
+        const key = ev?.getStateKey?.()
+        if (key) spaceChildIds.add(key)
+      }
+    }
+
     const activeSpaceId = activeSpaceIdRef.current
     if (!activeSpaceId) {
-      // Home view: show all non-space, non-DM rooms regardless of space membership
-      dispatch({ type: 'SET_ROOMS', rooms: allRooms.filter(r => !r.isSpaceRoom() && !directIds.has(r.roomId) && r.getMyMembership() === 'join') })
+      // Home view: only rooms not claimed by any space and not DMs.
+      dispatch({
+        type: 'SET_ROOMS',
+        rooms: allRooms.filter(r =>
+          !r.isSpaceRoom()
+          && !directIds.has(r.roomId)
+          && !spaceChildIds.has(r.roomId)
+          && r.getMyMembership() === 'join',
+        ),
+      })
       return
     }
 
     const space = client.getRoom(activeSpaceId)
     if (!space) {
-      dispatch({ type: 'SET_ROOMS', rooms: allRooms.filter(r => !r.isSpaceRoom() && !directIds.has(r.roomId) && r.getMyMembership() === 'join') })
+      dispatch({
+        type: 'SET_ROOMS',
+        rooms: allRooms.filter(r =>
+          !r.isSpaceRoom()
+          && !directIds.has(r.roomId)
+          && !spaceChildIds.has(r.roomId)
+          && r.getMyMembership() === 'join',
+        ),
+      })
       return
     }
 
@@ -1001,8 +1029,21 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
     const directIds = getDirectRoomIds(client)
     let spaceRooms: Room[]
     if (!spaceId) {
-      // Home view: show all non-space, non-DM rooms
-      spaceRooms = allRooms.filter(r => !r.isSpaceRoom() && !directIds.has(r.roomId))
+      // Home view: exclude any room already claimed by a space.
+      const spaceChildIds = new Set<string>()
+      for (const s of allRooms.filter(r => r.isSpaceRoom())) {
+        const events = s.currentState.getStateEvents(EventType.SpaceChild as string)
+        const list = Array.isArray(events) ? events : [events]
+        for (const ev of list) {
+          const key = ev?.getStateKey?.()
+          if (key) spaceChildIds.add(key)
+        }
+      }
+      spaceRooms = allRooms.filter(r =>
+        !r.isSpaceRoom()
+        && !directIds.has(r.roomId)
+        && !spaceChildIds.has(r.roomId),
+      )
     } else {
       const space = client.getRoom(spaceId)
       if (!space) return

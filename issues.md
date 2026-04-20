@@ -1,3 +1,2 @@
-- available channels in space are not shown -> there is some kind of "lobby" missing like in cinny
-- bot accounts not listed in member view
-- links not clickable in text messages
+- group chats are not visible in the home section
+- no ability to hide the deleted message information
