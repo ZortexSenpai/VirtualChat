@@ -1951,6 +1951,7 @@ function PrivacyTab() {
   const [sendReceipts, setSendReceipts] = useState(() => localStorage.getItem('vc_send_read_receipts') !== 'false')
   const [urlPreviews, setUrlPreviews] = useState(() => localStorage.getItem('vc_url_previews') !== 'false')
   const [gifHoverPlay, setGifHoverPlay] = useState(() => localStorage.getItem('vc_gif_hover_play') === 'true')
+  const [useTwemoji, setUseTwemoji] = useState(() => localStorage.getItem('vc_use_twemoji') === 'true')
   const [showJoin, setShowJoin] = useState(() => localStorage.getItem('vc_show_member_join') !== 'false')
   const [showLeave, setShowLeave] = useState(() => localStorage.getItem('vc_show_member_leave') !== 'false')
   const [showProfile, setShowProfile] = useState(() => localStorage.getItem('vc_show_profile_change') !== 'false')
@@ -1969,6 +1970,7 @@ function PrivacyTab() {
     { key: 'vc_send_read_receipts', label: t('settings.privacy.sendReceiptsLabel'), desc: t('settings.privacy.sendReceiptsDesc'),  val: sendReceipts, set: setSendReceipts },
     { key: 'vc_url_previews',      label: t('settings.privacy.urlPreviewsLabel'),    desc: t('settings.privacy.urlPreviewsDesc'),   val: urlPreviews,  set: setUrlPreviews },
     { key: 'vc_gif_hover_play',    label: t('settings.privacy.gifHoverPlayLabel'),  desc: t('settings.privacy.gifHoverPlayDesc'),  val: gifHoverPlay, set: setGifHoverPlay },
+    { key: 'vc_use_twemoji',       label: t('settings.privacy.useTwemojiLabel'),    desc: t('settings.privacy.useTwemojiDesc'),    val: useTwemoji,   set: setUseTwemoji },
   ]
   const sysRows = [
     { key: 'vc_show_member_join',     label: t('settings.privacy.memberJoinsLabel'),    desc: t('settings.privacy.memberJoinsDesc'),    val: showJoin,    set: setShowJoin },

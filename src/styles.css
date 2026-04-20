@@ -9829,6 +9829,24 @@ body {
   line-height: 1.2;
 }
 
+/* Twemoji-style emoji rendered inline with text. Sized to match the surrounding
+   font and aligned to text baseline so they don't push lines apart. */
+img.twemoji,
+.message-body img.twemoji,
+.markdown-body img.twemoji {
+  display: inline-block;
+  height: 1.2em;
+  width: 1.2em;
+  max-width: none;
+  max-height: none;
+  min-width: 0;
+  min-height: 0;
+  vertical-align: -0.2em;
+  margin: 0 1px;
+  border-radius: 0;
+  cursor: inherit;
+}
+
 .lightbox-overlay {
   position: fixed;
   inset: 0;

@@ -9,6 +9,7 @@ import { fetchMediaBlobUrl } from '../services/media'
 import { useImageViewer } from './ImageLightbox'
 import { isVoiceChannel } from '../services/roomKind'
 import { getRoomEmoteMap, renderEmoteString, isCustomEmoteKey, type RoomEmote } from '../services/emotes'
+import { twemojifyChildren, twemojifyString, useTwemojiEnabled } from '../services/twemoji'
 import ForwardModal from './ForwardModal'
 
 // Local context so emote-aware components don't need prop-drilling.
@@ -618,11 +619,13 @@ function substituteEmotes(
 }
 
 /** Build ReactMarkdown `components` overrides that substitute emotes in text-bearing elements. */
-function emoteMarkdownComponents(emoteMap: Record<string, RoomEmote>, client: any) {
+function emoteMarkdownComponents(emoteMap: Record<string, RoomEmote>, client: any, twemoji: boolean) {
   const hasEmotes = Object.keys(emoteMap).length > 0
-  const sub = hasEmotes
-    ? (children: React.ReactNode) => substituteEmotes(children, emoteMap, client)
-    : (children: React.ReactNode) => children
+  const sub = (children: React.ReactNode) => {
+    let result = hasEmotes ? substituteEmotes(children, emoteMap, client) : children
+    if (twemoji) result = twemojifyChildren(result)
+    return result
+  }
   return {
     // Open external links in a new tab with safe rel attrs.
     a: ({ children, href, ...rest }: any) => (
@@ -1123,6 +1126,7 @@ function EncryptionBadge({ event }: { event: MatrixEvent }) {
 function MessageContent({ event, client }: { event: MatrixEvent; client: any }) {
   const { state } = useMatrix()
   const emoteMap = useEmoteMap()
+  const useTwemoji = useTwemojiEnabled()
 
   if (event.isRedacted()) {
     return <div className="message-body message-deleted">[message deleted]</div>
@@ -1180,7 +1184,7 @@ function MessageContent({ event, client }: { event: MatrixEvent; client: any }) 
     return (
       <div className="reply-quote">
         <span className="reply-quote-sender">{senderName}</span>
-        <span className="reply-quote-text">{previewText}</span>
+        <span className="reply-quote-text">{useTwemoji ? twemojifyString(previewText) : previewText}</span>
       </div>
     )
   })() : null
@@ -1264,7 +1268,7 @@ function MessageContent({ event, client }: { event: MatrixEvent; client: any }) 
     ? renderFormattedSpoilers(formattedBody)
     : null
 
-  const mdComponents = emoteMarkdownComponents(emoteMap, client)
+  const mdComponents = emoteMarkdownComponents(emoteMap, client, useTwemoji)
 
   return (
     <>
@@ -1703,6 +1707,7 @@ function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; 
   const inputRef = useRef<HTMLInputElement>(null)
   const emoteMap = useEmoteMap()
   const { client } = useMatrix()
+  const useTwemoji = useTwemojiEnabled()
 
   useEffect(() => {
     function handleClick(e: MouseEvent) {
@@ -1789,7 +1794,7 @@ function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; 
                 onClick={() => { onPick(e); onClose() }}
                 title={e}
               >
-                {e}
+                {useTwemoji ? twemojifyString(e) : e}
               </button>
             ))}
           </div>
@@ -1808,7 +1813,7 @@ function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; 
               onClick={() => { onPick(item.emoji); onClose() }}
               title={item.keywords.split(' ')[0]}
             >
-              {item.emoji}
+              {useTwemoji ? twemojifyString(item.emoji) : item.emoji}
             </button>
           ))
         )}
@@ -1839,6 +1844,7 @@ function ReactionBar({
 }) {
   const { state, client } = useMatrix()
   const emoteMap = useEmoteMap()
+  const useTwemoji = useTwemojiEnabled()
   const groups = state.reactions[eventId] ?? []
   if (groups.length === 0) return null
 
@@ -1856,7 +1862,7 @@ function ReactionBar({
           >
             {imgUrl
               ? <img className="reaction-pill-img" src={imgUrl} alt={g.key} loading="lazy" />
-              : g.key}
+              : (useTwemoji ? twemojifyString(g.key) : g.key)}
             <span className="reaction-count">{g.count}</span>
           </button>
         )
@@ -1907,6 +1913,7 @@ function MessageContextMenu({
 }) {
   const ref = useRef<HTMLDivElement>(null)
   const [showEmojis, setShowEmojis] = useState(false)
+  const useTwemoji = useTwemojiEnabled()
 
   const menuW = 200
   const menuH = 300
@@ -1964,7 +1971,7 @@ function MessageContextMenu({
         <div className="msg-ctx-emojis">
           {QUICK_EMOJIS.map(e => (
             <button key={e} className="msg-ctx-emoji-btn" onClick={() => { onReact(e); onClose() }}>
-              {e}
+              {useTwemoji ? twemojifyString(e) : e}
             </button>
           ))}
         </div>
