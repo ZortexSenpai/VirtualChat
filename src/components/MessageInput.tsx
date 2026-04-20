@@ -8,6 +8,8 @@ import LocationShareModal from './LocationShareModal'
 import { matchCommands, parseCommandLine, findCommand } from '../services/commands'
 import type { SlashCommand } from '../services/commands'
 import { useTranslation } from '../services/i18n'
+import { searchEmojiShortcodes, type EmojiEntry } from '../services/emojiShortcodes'
+import { getRoomEmoteMap, type RoomEmote } from '../services/emotes'
 
 const DRAFT_KEY = (roomId: string) => `vc_draft_${roomId}`
 
@@ -511,6 +513,77 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
     setPaletteIndex(i => (paletteMatches.length === 0 ? 0 : Math.min(i, paletteMatches.length - 1)))
   }, [paletteMatches.length])
 
+  // --- Emoji autocomplete (":shortcode") state ---
+  // We track the cursor position so we know where the ":token" starts and can
+  // replace just that slice on completion instead of rewriting the whole value.
+  const [cursorPos, setCursorPos] = useState(0)
+  const [emojiPaletteIndex, setEmojiPaletteIndex] = useState(0)
+
+  const activeRoom = state.activeRoomId ? client?.getRoom(state.activeRoomId) ?? null : null
+  const roomEmoteMap: Record<string, RoomEmote> = useMemo(
+    () => activeRoom ? getRoomEmoteMap(activeRoom) : {},
+    // Re-read when the active room changes; don't need to re-read on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state.activeRoomId],
+  )
+
+  // Identify a ":token" at the cursor. The token is active only if there's at
+  // least one character after the colon and no whitespace/newline inside it,
+  // and the colon is preceded by whitespace, start-of-string, or punctuation
+  // (so "http://foo" or "12:34" don't accidentally open the picker).
+  const emojiQuery = useMemo(() => {
+    if (!text || editingEvent) return null
+    if (cursorPos === 0) return null
+    const before = text.slice(0, cursorPos)
+    const match = before.match(/(?:^|[\s(])(:([A-Za-z0-9_+\-]{1,32}))$/)
+    if (!match) return null
+    // Absolute start index of the ":" in `text`.
+    const start = cursorPos - match[1].length
+    return { start, end: cursorPos, query: match[2] }
+  }, [text, cursorPos, editingEvent])
+
+  interface EmojiPaletteItem {
+    kind: 'unicode' | 'custom'
+    shortcode: string
+    emoji?: string
+    emote?: RoomEmote
+  }
+
+  const emojiMatches = useMemo<EmojiPaletteItem[]>(() => {
+    if (!emojiQuery) return []
+    const q = emojiQuery.query.toLowerCase()
+    const out: EmojiPaletteItem[] = []
+    for (const [code, emote] of Object.entries(roomEmoteMap)) {
+      if (code.toLowerCase().includes(q)) {
+        out.push({ kind: 'custom', shortcode: code, emote })
+      }
+    }
+    const unicode: EmojiEntry[] = searchEmojiShortcodes(emojiQuery.query, 8 - out.length)
+    for (const e of unicode) {
+      out.push({ kind: 'unicode', shortcode: e.shortcode, emoji: e.emoji })
+    }
+    return out.slice(0, 8)
+  }, [emojiQuery, roomEmoteMap])
+
+  useEffect(() => {
+    setEmojiPaletteIndex(i => (emojiMatches.length === 0 ? 0 : Math.min(i, emojiMatches.length - 1)))
+  }, [emojiMatches.length])
+
+  function completeEmoji(item: EmojiPaletteItem) {
+    if (!emojiQuery) return
+    const replacement = item.kind === 'custom' ? `:${item.shortcode}:` : item.emoji ?? ''
+    const newText = text.slice(0, emojiQuery.start) + replacement + text.slice(emojiQuery.end)
+    const newCursor = emojiQuery.start + replacement.length
+    setText(newText)
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current
+      if (!ta) return
+      ta.focus()
+      ta.setSelectionRange(newCursor, newCursor)
+      setCursorPos(newCursor)
+    })
+  }
+
   // Auto-dismiss ephemeral command feedback
   useEffect(() => {
     if (!commandError && !commandInfo) return
@@ -645,6 +718,31 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
         e.preventDefault()
         const cmd = paletteMatches[paletteIndex]
         if (cmd) completeCommand(cmd)
+        return
+      }
+    }
+    const emojiOpen = emojiMatches.length > 0 && emojiQuery
+    if (emojiOpen) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setEmojiPaletteIndex(i => (i + 1) % emojiMatches.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setEmojiPaletteIndex(i => (i - 1 + emojiMatches.length) % emojiMatches.length)
+        return
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+        e.preventDefault()
+        const item = emojiMatches[emojiPaletteIndex]
+        if (item) completeEmoji(item)
+        return
+      }
+      if (e.key === 'Escape') {
+        // Close the palette without sending / cancelling reply etc.
+        e.preventDefault()
+        setCursorPos(-1)
         return
       }
     }
@@ -785,6 +883,41 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
 
       {recording && (
         <VoiceRecorder onCancel={() => setRecording(false)} onSend={handleVoiceSend} />
+      )}
+
+      {emojiQuery && emojiMatches.length > 0 && (
+        <div className="command-palette command-palette--emoji" role="listbox" aria-label="Emoji">
+          {emojiMatches.map((item, i) => {
+            const mxcUrl = item.kind === 'custom' && item.emote
+              ? (client as any)?.mxcUrlToHttp(item.emote.url, 32, 32, 'scale', false, true)
+              : null
+            return (
+              <button
+                key={`${item.kind}-${item.shortcode}`}
+                type="button"
+                className={`command-palette-item${i === emojiPaletteIndex ? ' selected' : ''}`}
+                onMouseEnter={() => setEmojiPaletteIndex(i)}
+                onMouseDown={e => { e.preventDefault(); completeEmoji(item) }}
+                role="option"
+                aria-selected={i === emojiPaletteIndex}
+              >
+                <span className="emoji-palette-glyph">
+                  {mxcUrl
+                    ? <img src={mxcUrl} alt={item.shortcode} className="emoji-palette-img" />
+                    : item.emoji}
+                </span>
+                <span className="command-palette-name">:{item.shortcode}:</span>
+                {item.kind === 'custom' && <span className="command-palette-desc">Room emote</span>}
+              </button>
+            )
+          })}
+          <div className="command-palette-footer">
+            <kbd>Tab</kbd> complete
+            <kbd>↑↓</kbd> navigate
+            <kbd>Enter</kbd> insert
+            <kbd>Esc</kbd> close
+          </div>
+        </div>
       )}
 
       {commandQuery && (paletteMatches.length > 0 || commandQuery.typingArgs) && (
@@ -981,6 +1114,7 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
           value={text}
           onChange={e => {
             setText(e.target.value)
+            setCursorPos(e.target.selectionStart)
             // Resize is handled by the useLayoutEffect watching `text`.
             if (e.target.value.trim()) {
               sendTypingNotification(true)
@@ -990,6 +1124,8 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
               sendTypingNotification(false)
             }
           }}
+          onSelect={e => setCursorPos((e.target as HTMLTextAreaElement).selectionStart)}
+          onClick={e => setCursorPos((e.target as HTMLTextAreaElement).selectionStart)}
           onKeyDown={e => { handleFormatKey(e); handleKeyDown(e) }}
           onPaste={e => {
             if (!state.activeRoomId || editingEvent) return
