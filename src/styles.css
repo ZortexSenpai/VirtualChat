@@ -191,6 +191,28 @@ body {
   gap: 10px;
 }
 
+/* Draggable handle between side panels and the chat area. A slim flex child
+   that takes col-resize pointer events; it highlights on hover/drag. */
+.panel-resizer {
+  flex: 0 0 4px;
+  align-self: stretch;
+  cursor: col-resize;
+  background: transparent;
+  border-radius: 4px;
+  z-index: 5;
+  transition: background 0.15s ease;
+}
+
+.panel-resizer:hover,
+.panel-resizer:active {
+  background: var(--brand, rgba(88, 101, 242, 0.6));
+}
+
+@media (max-width: 768px) {
+  /* Mobile uses drawer layout — resizing doesn't make sense. */
+  .panel-resizer { display: none; }
+}
+
 /* ---- Login Page ---- */
 .login-page {
   display: flex;
@@ -488,7 +510,7 @@ body {
 
 /* ---- Channel Sidebar ---- */
 .channel-sidebar {
-  width: 240px;
+  width: var(--channel-sidebar-width, 240px);
   flex-shrink: 0;
   background: var(--glass-panel);
   backdrop-filter: var(--glass-blur);
@@ -2004,7 +2026,7 @@ body {
 
 /* ---- Member List ---- */
 .member-list {
-  width: 240px;
+  width: var(--member-list-width, 240px);
   flex-shrink: 0;
   background: var(--glass-panel);
   backdrop-filter: var(--glass-blur);

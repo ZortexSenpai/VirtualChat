@@ -64,6 +64,60 @@ function RecoveryKeyModal() {
   )
 }
 
+function PanelResizer({ side }: { side: 'left' | 'right' }) {
+  const storageKey = side === 'left' ? 'vc_sidebar_width' : 'vc_member_list_width'
+  const cssVar = side === 'left' ? '--channel-sidebar-width' : '--member-list-width'
+  const defaultWidth = 240
+  const minWidth = 160
+  const maxWidth = 500
+
+  const [width, setWidth] = useState<number>(() => {
+    const raw = parseInt(localStorage.getItem(storageKey) ?? '', 10)
+    return Number.isFinite(raw) && raw > 0 ? raw : defaultWidth
+  })
+
+  useEffect(() => {
+    document.documentElement.style.setProperty(cssVar, `${width}px`)
+    localStorage.setItem(storageKey, String(width))
+  }, [width, cssVar, storageKey])
+
+  function onMouseDown(e: React.MouseEvent) {
+    e.preventDefault()
+    const startX = e.clientX
+    const startWidth = width
+    function onMove(ev: MouseEvent) {
+      const delta = ev.clientX - startX
+      const next = side === 'left' ? startWidth + delta : startWidth - delta
+      setWidth(Math.max(minWidth, Math.min(maxWidth, next)))
+    }
+    function onUp() {
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+      document.body.style.cursor = ''
+      document.body.style.userSelect = ''
+    }
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+    document.body.style.cursor = 'col-resize'
+    document.body.style.userSelect = 'none'
+  }
+
+  function onDoubleClick() {
+    setWidth(defaultWidth)
+  }
+
+  return (
+    <div
+      className={`panel-resizer panel-resizer--${side}`}
+      onMouseDown={onMouseDown}
+      onDoubleClick={onDoubleClick}
+      role="separator"
+      aria-orientation="vertical"
+      title="Drag to resize (double-click to reset)"
+    />
+  )
+}
+
 function AppContent() {
   const { state, loginWithSsoToken } = useMatrix()
   const [ssoError, setSsoError] = useState<string | null>(null)
@@ -187,11 +241,13 @@ function AppContent() {
         />
         <SpaceBar />
         <ChannelSidebar />
+        {!isMobile && sidebarOpen && <PanelResizer side="left" />}
         <ChatArea
           sidebarOpen={sidebarOpen}
           onToggleSidebar={toggleSidebar}
           onToggleMembers={toggleMembers}
         />
+        {!isMobile && state.activeRoomId && <PanelResizer side="right" />}
         <MemberList />
         <VerificationModal />
         <RecoveryKeyModal />
