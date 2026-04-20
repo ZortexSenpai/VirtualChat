@@ -433,14 +433,36 @@ async function fetchAndDecryptAttachment(file: EncryptedFileInfo, client: any): 
 
 function MessageImage({ mxcUrl, alt, client, mimetype, forceDownload, clickable = true, encryptedFile }: { mxcUrl: string; alt: string; client: any; mimetype?: string; forceDownload?: boolean; clickable?: boolean; encryptedFile?: EncryptedFileInfo }) {
   const [src, setSrc] = useState<string | null>(null)
+  const [staticThumbSrc, setStaticThumbSrc] = useState<string | null>(null)
+  const [hovering, setHovering] = useState(false)
   const [failed, setFailed] = useState(false)
   const { open: openLightbox } = useImageViewer()
+
+  const [hoverOnlyPlay, setHoverOnlyPlay] = useState(
+    () => localStorage.getItem('vc_gif_hover_play') === 'true',
+  )
+  useEffect(() => {
+    function onChange() {
+      setHoverOnlyPlay(localStorage.getItem('vc_gif_hover_play') === 'true')
+    }
+    window.addEventListener('vc:settings-changed', onChange)
+    return () => window.removeEventListener('vc:settings-changed', onChange)
+  }, [])
+
+  const isAnimated =
+    forceDownload ||
+    mimetype === 'image/gif' ||
+    mimetype === 'image/webp' ||
+    mimetype === 'image/apng' ||
+    (!mimetype && alt.toLowerCase().endsWith('.gif'))
 
   useEffect(() => {
     if (!mxcUrl || !client) { setFailed(true); return }
     let cancelled = false
 
     // Encrypted attachment: download ciphertext, decrypt, present as blob URL.
+    // Encrypted media only has one representation (the decrypted blob), so we
+    // can't show a static thumbnail server-side — the animation always plays.
     if (encryptedFile) {
       fetchAndDecryptAttachment(encryptedFile, client)
         .then(blob => {
@@ -455,12 +477,6 @@ function MessageImage({ mxcUrl, alt, client, mimetype, forceDownload, clickable 
     const token = localStorage.getItem('mx_access_token')
     // Animated images must use the download endpoint (no resize params) —
     // the thumbnail endpoint strips animation and returns a static frame.
-    const isAnimated =
-      forceDownload ||
-      mimetype === 'image/gif' ||
-      mimetype === 'image/webp' ||
-      mimetype === 'image/apng' ||
-      (!mimetype && alt.toLowerCase().endsWith('.gif'))
 
     // Build primary URL (authenticated media, Matrix 1.11+) and legacy fallback
     let primaryUrl: string | null
@@ -515,19 +531,66 @@ function MessageImage({ mxcUrl, alt, client, mimetype, forceDownload, clickable 
     return () => { cancelled = true }
   }, [mxcUrl, client, mimetype, forceDownload, alt, encryptedFile])
 
+  // When hover-only GIF playback is on, also fetch a static thumbnail variant
+  // so we can show a still frame until the user hovers. The thumbnail endpoint
+  // strips animation server-side.
+  useEffect(() => {
+    if (!hoverOnlyPlay || !isAnimated || encryptedFile) {
+      setStaticThumbSrc(null)
+      return
+    }
+    if (!mxcUrl || !client) return
+    let cancelled = false
+    const token = localStorage.getItem('mx_access_token')
+    const staticPrimary = token
+      ? (client.mxcUrlToHttp(mxcUrl, 400, 300, 'scale', false, undefined, true) ?? null)
+      : (client.mxcUrlToHttp(mxcUrl, 400, 300, 'scale') ?? null)
+    const staticLegacy = client.mxcUrlToHttp(mxcUrl, 400, 300, 'scale') ?? null
+    if (!staticPrimary) return
+    ;(async () => {
+      try {
+        const r = await fetch(staticPrimary, token ? { headers: { Authorization: `Bearer ${token}` } } : undefined)
+        if (r.ok) {
+          const blob = await r.blob()
+          if (!cancelled) setStaticThumbSrc(URL.createObjectURL(blob))
+          return
+        }
+      } catch { /* fall through to legacy */ }
+      if (!staticLegacy || staticLegacy === staticPrimary) return
+      try {
+        const r2 = await fetch(staticLegacy)
+        if (r2.ok) {
+          const blob = await r2.blob()
+          if (!cancelled) setStaticThumbSrc(URL.createObjectURL(blob))
+        }
+      } catch { /* static thumb is best-effort */ }
+    })()
+    return () => { cancelled = true }
+  }, [hoverOnlyPlay, isAnimated, encryptedFile, mxcUrl, client])
+
   if (failed) return <div className="message-body">[image]</div>
   if (!src) return <div className="message-body message-img-loading" />
+
+  const useStaticFrame = hoverOnlyPlay && isAnimated && !encryptedFile && staticThumbSrc && !hovering
+  const displaySrc = useStaticFrame ? staticThumbSrc! : src
+  const hoverProps = (hoverOnlyPlay && isAnimated && !encryptedFile && staticThumbSrc)
+    ? { onMouseEnter: () => setHovering(true), onMouseLeave: () => setHovering(false) }
+    : {}
+
   if (!clickable) {
-    return <div className="message-body"><img src={src} alt={alt} /></div>
+    return <div className="message-body"><img src={displaySrc} alt={alt} {...hoverProps} /></div>
   }
   return (
     <div className="message-body">
-      <img
-        src={src}
-        alt={alt}
-        className="message-img-clickable"
-        onClick={() => openLightbox({ mxcUrl, alt, placeholderSrc: src })}
-      />
+      <span className={`message-img-wrap${useStaticFrame ? ' message-img-wrap--gif-paused' : ''}`} {...hoverProps}>
+        <img
+          src={displaySrc}
+          alt={alt}
+          className="message-img-clickable"
+          onClick={() => openLightbox({ mxcUrl, alt, placeholderSrc: src })}
+        />
+        {useStaticFrame && <span className="message-img-gif-badge">GIF</span>}
+      </span>
     </div>
   )
 }

@@ -181,6 +181,8 @@ const en: Record<string, string> = {
   'settings.privacy.sendReceiptsDesc': 'Let others know when you have read their messages.',
   'settings.privacy.urlPreviewsLabel': 'Show link previews',
   'settings.privacy.urlPreviewsDesc': 'Fetch Open Graph metadata for URLs in messages. Disabling avoids contacting your homeserver for link info.',
+  'settings.privacy.gifHoverPlayLabel': 'Play GIFs on hover only',
+  'settings.privacy.gifHoverPlayDesc': 'Show a static frame for animated images by default; play the animation only while the cursor is over the image.',
   'settings.privacy.memberJoinsLabel': 'Member joins',
   'settings.privacy.memberJoinsDesc': 'Show a notice when someone joins the room.',
   'settings.privacy.memberLeavesLabel': 'Member leaves / kicks / bans',

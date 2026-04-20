@@ -1,2 +1,0 @@
-- group chats are not visible in the home section
-- no ability to hide the deleted message information

@@ -9808,6 +9808,27 @@ body {
   filter: brightness(1.06);
 }
 
+.message-img-wrap {
+  position: relative;
+  display: inline-block;
+  line-height: 0;
+}
+
+.message-img-gif-badge {
+  position: absolute;
+  bottom: 6px;
+  left: 6px;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  background: rgba(0, 0, 0, 0.65);
+  color: #fff;
+  border-radius: 4px;
+  pointer-events: none;
+  line-height: 1.2;
+}
+
 .lightbox-overlay {
   position: fixed;
   inset: 0;
