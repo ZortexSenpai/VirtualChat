@@ -724,28 +724,42 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
       }
     })
 
+    const appendMessageEvent = (event: MatrixEvent, room: Room) => {
+      const t = event.getType()
+      if (t !== EventType.RoomMessage && t !== EventType.Sticker && t !== 'm.poll.start' && t !== 'org.matrix.msc3381.poll.start') return
+      if (event.getContent()['m.relates_to']?.rel_type === 'm.replace') return
+      dispatch({ type: 'APPEND_MESSAGE', message: event, roomId: room.roomId })
+      const isLive =
+        hasCompletedInitialSyncRef.current &&
+        Date.now() - event.getTs() < 10_000
+      if (isLive) {
+        handleIncomingEvent(event, room, client, activeRoomIdRef.current, (roomId) => {
+          if (activeRoomIdRef.current === roomId) return
+          setActiveRoom(roomId).catch(console.error)
+        })
+      }
+    }
+
     client.on(
       RoomEvent.Timeline,
       (event: MatrixEvent, room: Room | undefined, toStartOfTimeline: boolean | undefined) => {
         if (toStartOfTimeline) return
         if (!room) return
         if (event.status !== null) return // skip local echoes; only process server-confirmed events
+
+        // Encrypted events arrive before decryption completes. Re-dispatch once
+        // the SDK emits Event.decrypted so the message renders without a reload.
+        if (event.getType() === 'm.room.encrypted') {
+          event.once('Event.decrypted' as any, () => {
+            appendMessageEvent(event, room)
+            refreshRooms()
+          })
+          return
+        }
+
         if (event.getType() === EventType.RoomMessage || event.getType() === EventType.Sticker || event.getType() === 'm.poll.start' || event.getType() === 'org.matrix.msc3381.poll.start') {
           if (event.getContent()['m.relates_to']?.rel_type !== 'm.replace') {
-            dispatch({ type: 'APPEND_MESSAGE', message: event, roomId: room.roomId })
-            // Only notify for genuinely live events — not initial-sync backlog
-            // (otherwise a page reload replays sounds for every recent message)
-            // and not sync gaps / paginated fills where old events re-enter the
-            // timeline. Event age of 10s matches Element's threshold.
-            const isLive =
-              hasCompletedInitialSyncRef.current &&
-              Date.now() - event.getTs() < 10_000
-            if (isLive) {
-              handleIncomingEvent(event, room, client, activeRoomIdRef.current, (roomId) => {
-                if (activeRoomIdRef.current === roomId) return
-                setActiveRoom(roomId).catch(console.error)
-              })
-            }
+            appendMessageEvent(event, room)
           }
         }
         // Re-render the poll that a response/end relates to
@@ -1151,8 +1165,13 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
       const rawReplyBody = (replyTo.getContent().body ?? '') as string
       // Strip any existing reply fallback so chained replies don't nest quoted text
       const cleanReplyBody = rawReplyBody.replace(/^(>[^\n]*\n)+\n/, '')
-      // Matrix reply fallback body format
-      content.body = `> <${replySender}> ${cleanReplyBody}\n\n${trimmed}`
+      // Matrix reply fallback body format: every line of the quoted body must be
+      // prefixed with "> " so the receiver can reliably strip it.
+      const quotedLines = cleanReplyBody.split('\n')
+      const firstLine = `> <${replySender}> ${quotedLines[0] ?? ''}`
+      const restLines = quotedLines.slice(1).map(l => `> ${l}`)
+      const quotedBlock = [firstLine, ...restLines].join('\n')
+      content.body = `${quotedBlock}\n\n${trimmed}`
       content['m.relates_to'] = { 'm.in_reply_to': { event_id: replyId } }
     }
     await client.sendEvent(roomId, EventType.RoomMessage, content)
@@ -1410,6 +1429,22 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
       opts.initial_state = [{ type: 'm.room.encryption', state_key: '', content: { algorithm: 'm.megolm.v1.aes-sha2' } }]
     }
     const resp = await client.createRoom(opts)
+
+    const activeSpaceId = activeSpaceIdRef.current
+    if (activeSpaceId) {
+      try {
+        const via = client.getDomain()
+        await client.sendStateEvent(
+          activeSpaceId,
+          EventType.SpaceChild as any,
+          { via: via ? [via] : [] },
+          resp.room_id,
+        )
+      } catch (err) {
+        console.warn('Failed to link new room to active space:', err)
+      }
+    }
+
     refreshRooms()
     return resp.room_id
   }

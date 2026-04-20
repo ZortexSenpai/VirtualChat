@@ -1240,6 +1240,32 @@ body {
   position: relative;
 }
 
+.thread-indicator {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--brand, #5865f2);
+  background: rgba(88, 101, 242, 0.12);
+  border: 1px solid rgba(88, 101, 242, 0.28);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.thread-indicator:hover {
+  background: rgba(88, 101, 242, 0.22);
+  border-color: rgba(88, 101, 242, 0.55);
+}
+
+.thread-indicator svg {
+  width: 14px;
+  height: 14px;
+}
+
 .reaction-pill {
   display: inline-flex;
   align-items: center;
@@ -1377,6 +1403,11 @@ body {
   padding: 0;
   width: 320px;
   max-height: 420px;
+}
+
+.reaction-picker--up {
+  top: auto;
+  bottom: calc(100% + 4px);
 }
 
 .reaction-picker-search {
@@ -2054,6 +2085,33 @@ body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+
+.member-role-badge {
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 1px 6px;
+  border-radius: 999px;
+  flex-shrink: 0;
+  line-height: 1.4;
+}
+
+.member-role-badge--admin {
+  background: rgba(240, 71, 71, 0.18);
+  color: #ff8a8a;
+  border: 1px solid rgba(240, 71, 71, 0.35);
+}
+
+.member-role-badge--mod {
+  background: rgba(88, 101, 242, 0.18);
+  color: #9aa5ff;
+  border: 1px solid rgba(88, 101, 242, 0.35);
 }
 
 .member-status-text {

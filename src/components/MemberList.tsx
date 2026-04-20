@@ -14,12 +14,19 @@ interface DisplayMember {
   userId: string
   name: string
   avatarMxc: string | null
+  powerLevel: number
 }
 
 function getPresenceCls(presence: string | undefined): string {
   if (presence === 'online') return 'online'
   if (presence === 'unavailable') return 'unavailable'
   return 'offline'
+}
+
+function roleLabelForPowerLevel(pl: number): string | null {
+  if (pl >= 100) return 'Admin'
+  if (pl >= 50) return 'Mod'
+  return null
 }
 
 function MemberItem({
@@ -46,6 +53,8 @@ function MemberItem({
     onOpenProfile({ userId: member.userId, displayName, avatarMxc, anchorRect: rect, roomId, myUserId })
   }
 
+  const roleLabel = roleLabelForPowerLevel(member.powerLevel)
+
   return (
     <div className="member-item" title={member.userId} onClick={handleClick} style={{ cursor: 'pointer' }}>
       <div className="member-avatar-wrap">
@@ -56,7 +65,14 @@ function MemberItem({
       </div>
 
       <div className="member-info">
-        <div className="member-name">{displayName}</div>
+        <div className="member-name">
+          {displayName}
+          {roleLabel && (
+            <span className={`member-role-badge member-role-badge--${roleLabel.toLowerCase()}`}>
+              {roleLabel}
+            </span>
+          )}
+        </div>
         {statusMsg && <div className="member-status-text">{statusMsg}</div>}
       </div>
     </div>
@@ -68,6 +84,7 @@ function toDisplayMembers(list: RoomMember[]): DisplayMember[] {
     userId: m.userId,
     name: m.name ?? m.userId,
     avatarMxc: m.getMxcAvatarUrl() ?? null,
+    powerLevel: m.powerLevel ?? 0,
   }))
 }
 
@@ -113,10 +130,15 @@ export default function MemberList() {
         const resp: any = await (client as any).getJoinedRoomMembers(roomId)
         if (cancelled) return
         const joined = resp?.joined ?? {}
+        const r = client.getRoom(roomId)
+        const plContent = r?.currentState?.getStateEvents('m.room.power_levels', '')?.getContent() as any
+        const users: Record<string, number> = plContent?.users ?? {}
+        const defaultPl: number = plContent?.users_default ?? 0
         const list: DisplayMember[] = Object.entries(joined).map(([userId, info]: [string, any]) => ({
           userId,
           name: info?.display_name || userId.replace(/^@/, '').split(':')[0],
           avatarMxc: info?.avatar_url ?? null,
+          powerLevel: users[userId] ?? defaultPl,
         }))
         if (list.length > 0) setLocalMembers(list)
       } catch {

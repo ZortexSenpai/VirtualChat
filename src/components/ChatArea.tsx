@@ -1065,22 +1065,56 @@ function MessageContent({ event, client }: { event: MatrixEvent; client: any }) 
   const content = effectiveContent
   const msgtype = content.msgtype
 
-  // Reply quote
-  const replyToId: string | undefined = event.getContent()['m.relates_to']?.['m.in_reply_to']?.event_id
+  // Reply quote. Thread messages carry an `m.in_reply_to` as a fallback for
+  // non-threaded clients — don't render that as a real reply.
+  const relatesTo = event.getContent()['m.relates_to']
+  const inReplyTo = relatesTo?.['m.in_reply_to'] as { event_id?: string; is_falling_back?: boolean } | undefined
+  const inReplyToId: string | undefined = inReplyTo?.event_id
+  const isThreadFallback = relatesTo?.rel_type === 'm.thread' && inReplyTo?.is_falling_back !== false
+  const replyToId: string | undefined = isThreadFallback ? undefined : inReplyToId
   const repliedEvent = replyToId
     ? state.messages.find(m => m.getId() === replyToId) ?? null
     : null
 
-  const replyQuote = repliedEvent ? (
-    <div className="reply-quote">
-      <span className="reply-quote-sender">
-        {repliedEvent.getSender()?.replace(/^@/, '').split(':')[0]}
-      </span>
-      <span className="reply-quote-text">
-        {(repliedEvent.getContent().body ?? '').replace(/^(>[^\n]*\n)+\n/, '')}
-      </span>
-    </div>
-  ) : null
+  const replyQuote = repliedEvent ? (() => {
+    const repliedSender = repliedEvent.getSender() ?? ''
+    const repliedRoom = state.activeRoomId ? client?.getRoom(state.activeRoomId) : null
+    const senderName = repliedRoom?.getMember(repliedSender)?.name
+      || client?.getUser(repliedSender)?.displayName
+      || repliedSender.replace(/^@/, '').split(':')[0]
+
+    const repliedReplacement = repliedEvent.replacingEvent() as MatrixEvent | null
+    const repliedContent = repliedReplacement?.getContent()?.['m.new_content'] ?? repliedEvent.getContent()
+    const repliedMsgtype = repliedContent.msgtype
+
+    let previewText: string
+    if (repliedEvent.isRedacted()) {
+      previewText = '[message deleted]'
+    } else if (repliedEvent.getType() === 'm.sticker') {
+      previewText = 'Sticker'
+    } else if (repliedMsgtype === 'm.image') {
+      previewText = 'Image'
+    } else if (repliedMsgtype === 'm.video') {
+      previewText = 'Video'
+    } else if (repliedMsgtype === 'm.audio') {
+      previewText = 'Audio'
+    } else if (repliedMsgtype === 'm.file') {
+      previewText = 'File'
+    } else if (repliedMsgtype === 'm.location') {
+      previewText = 'Location'
+    } else if (repliedEvent.getType() === 'm.poll.start' || repliedEvent.getType() === 'org.matrix.msc3381.poll.start') {
+      previewText = 'Poll'
+    } else {
+      previewText = ((repliedContent.body as string | undefined) ?? '').replace(/^(>[^\n]*\n)+\n/, '').replace(/\n+/g, ' ')
+    }
+
+    return (
+      <div className="reply-quote">
+        <span className="reply-quote-sender">{senderName}</span>
+        <span className="reply-quote-text">{previewText}</span>
+      </div>
+    )
+  })() : null
 
   // Sticker events (m.sticker) — always use download endpoint to preserve animation
   const isSticker = event.getType() === 'm.sticker'
@@ -1133,12 +1167,15 @@ function MessageContent({ event, client }: { event: MatrixEvent; client: any }) 
     return <>{replyQuote}<AudioMessage mxcUrl={rawUrl} client={client} mimetype={content.info?.mimetype} isVoice={isVoice} duration={duration} waveform={waveform} fileName={content.body || 'audio'} /></>
   }
 
-  // Strip the Matrix reply fallback lines ("> text\n\n") from the rendered body
+  // Strip the Matrix reply fallback lines ("> text\n\n") from the rendered body.
+  // Applies whenever an in_reply_to is present — including thread fallbacks, so
+  // the quoted prefix doesn't leak into the body when the reply quote is hidden.
   let bodyText: string = content.body ?? ''
-  if (replyToId) {
-    // Remove the "> quoted lines\n\n" prefix that Matrix adds to reply bodies
+  if (inReplyToId) {
     bodyText = bodyText.replace(/^(>[^\n]*\n)*\n/, '')
   }
+  // Preserve single newlines as hard breaks — markdown otherwise collapses them.
+  bodyText = bodyText.replace(/(?<!\n)\n(?!\n)/g, '  \n')
 
   const previewUrls = extractPreviewUrls(bodyText)
 
@@ -1585,6 +1622,7 @@ const ALL_EMOJIS: { emoji: string; keywords: string }[] = [
 function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const [search, setSearch] = useState('')
+  const [flipUp, setFlipUp] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const emoteMap = useEmoteMap()
   const { client } = useMatrix()
@@ -1597,8 +1635,18 @@ function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; 
     return () => document.removeEventListener('mousedown', handleClick)
   }, [onClose])
 
+  // Focus without letting the browser scroll the chat upward to reveal the input —
+  // that scroll was the main cause of the "layout shift" on the last message.
   useEffect(() => {
-    inputRef.current?.focus()
+    inputRef.current?.focus({ preventScroll: true })
+  }, [])
+
+  // If the picker would extend past the viewport (typical for the last message),
+  // flip it to open upward instead of downward.
+  useEffect(() => {
+    if (!ref.current) return
+    const rect = ref.current.getBoundingClientRect()
+    if (rect.bottom > window.innerHeight - 8) setFlipUp(true)
   }, [])
 
   const query = search.trim().toLowerCase()
@@ -1616,7 +1664,7 @@ function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; 
   const showQuickRow = !query
 
   return (
-    <div className="reaction-picker reaction-picker-expanded" ref={ref}>
+    <div className={`reaction-picker reaction-picker-expanded${flipUp ? ' reaction-picker--up' : ''}`} ref={ref}>
       <div className="reaction-picker-search">
         <input
           ref={inputRef}
@@ -1689,6 +1737,17 @@ function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; 
         )}
       </div>
     </div>
+  )
+}
+
+// ---- Thread indicator ("N replies" pill shown under a threaded root message) ----
+
+function ThreadIndicator({ count, onOpen }: { count: number; onOpen: () => void }) {
+  return (
+    <button className="thread-indicator" onClick={onOpen} type="button" title="Open thread">
+      <CtxThreadIcon />
+      <span>{count} {count === 1 ? 'reply' : 'replies'}</span>
+    </button>
   )
 }
 
@@ -1790,9 +1849,12 @@ function MessageContextMenu({
     }
   }, [onClose])
 
-  const body = data.event.isRedacted()
-    ? ''
-    : ((data.event.replacingEvent()?.getContent()?.['m.new_content'] ?? data.event.getContent()).body ?? '')
+  const effectiveContent = data.event.isRedacted()
+    ? {}
+    : (data.event.replacingEvent()?.getContent()?.['m.new_content'] ?? data.event.getContent())
+  const body = effectiveContent.body ?? ''
+  const msgtype = effectiveContent.msgtype
+  const isTextLike = msgtype === 'm.text' || msgtype === 'm.emote' || msgtype === 'm.notice'
 
   return (
     <div ref={ref} className="msg-ctx-menu" style={{ top: ay, left: ax }}>
@@ -1836,7 +1898,7 @@ function MessageContextMenu({
         </button>
       )}
       {(data.isMine || data.canRedact) && <div className="msg-ctx-sep" />}
-      {data.isMine && !data.event.isRedacted() && (
+      {data.isMine && !data.event.isRedacted() && isTextLike && (
         <button className="msg-ctx-item" onClick={() => { onEdit(); onClose() }}>
           <CtxEditIcon /> Edit message
         </button>
@@ -1890,11 +1952,14 @@ function MessageActions({
   const [linkCopied, setLinkCopied] = useState(false)
   const moreRef = useRef<HTMLDivElement>(null)
 
-  const copyBody = event.isRedacted()
-    ? ''
-    : (event.replacingEvent()?.getContent()?.['m.new_content'] ?? event.getContent()).body ?? ''
+  const effectiveContent = event.isRedacted()
+    ? {}
+    : (event.replacingEvent()?.getContent()?.['m.new_content'] ?? event.getContent())
+  const copyBody = effectiveContent.body ?? ''
+  const msgtype = effectiveContent.msgtype
+  const isTextLike = msgtype === 'm.text' || msgtype === 'm.emote' || msgtype === 'm.notice'
   const canForward = !event.isRedacted()
-  const canEdit = isMine && !event.isRedacted()
+  const canEdit = isMine && !event.isRedacted() && isTextLike
   const canDelete = (isMine || canRedact) && !event.isRedacted()
 
   function handleCopyLink() {
@@ -2067,9 +2132,6 @@ function ThreadPanel({ rootEvent, onClose }: { rootEvent: MatrixEvent; onClose: 
   }
 
   const rootSenderName = getDisplayName(rootEvent.getSender() ?? '')
-  const rootBody = rootEvent.isRedacted()
-    ? '[deleted]'
-    : (rootEvent.replacingEvent()?.getContent()?.['m.new_content']?.body ?? rootEvent.getContent().body ?? '')
 
   return (
     <div className="thread-panel">
@@ -2090,7 +2152,9 @@ function ThreadPanel({ rootEvent, onClose }: { rootEvent: MatrixEvent; onClose: 
             <span className="thread-msg-sender">{rootSenderName}</span>
             <span className="thread-msg-time">{formatShortTime(rootEvent.getTs())}</span>
           </div>
-          <div className="thread-msg-body">{rootBody}</div>
+          <div className="thread-msg-body">
+            <MessageContent event={rootEvent} client={client} />
+          </div>
         </div>
 
         <div className="thread-divider">
@@ -2104,9 +2168,6 @@ function ThreadPanel({ rootEvent, onClose }: { rootEvent: MatrixEvent; onClose: 
             const sender = ev.getSender() ?? ''
             const senderName = getDisplayName(sender)
             const avatarMxc = activeRoom?.getMember(sender)?.getMxcAvatarUrl() ?? null
-            const body = ev.isRedacted()
-              ? '[deleted]'
-              : (ev.replacingEvent()?.getContent()?.['m.new_content']?.body ?? ev.getContent().body ?? '')
             return (
               <div key={ev.getId()} className="thread-msg">
                 <div className="thread-msg-meta">
@@ -2114,7 +2175,9 @@ function ThreadPanel({ rootEvent, onClose }: { rootEvent: MatrixEvent; onClose: 
                   <span className="thread-msg-sender">{senderName}</span>
                   <span className="thread-msg-time">{formatShortTime(ev.getTs())}</span>
                 </div>
-                <div className="thread-msg-body">{body}</div>
+                <div className="thread-msg-body">
+                  <MessageContent event={ev} client={client} />
+                </div>
               </div>
             )
           })
@@ -2202,14 +2265,29 @@ export default function ChatArea({
 
   const ignoredSet = React.useMemo(() => new Set(state.ignoredUserIds), [state.ignoredUserIds])
   const visibleMessages = React.useMemo(() => (
-    ignoredSet.size > 0
-      ? state.messages.filter(m => !ignoredSet.has(m.getSender() ?? ''))
-      : state.messages
+    state.messages.filter(m => {
+      if (ignoredSet.has(m.getSender() ?? '')) return false
+      // Hide thread replies from the main chat — they belong in the thread panel.
+      if (m.getContent()['m.relates_to']?.rel_type === 'm.thread') return false
+      return true
+    })
   ), [state.messages, ignoredSet])
   const groups = React.useMemo(
     () => groupMessages(visibleMessages, client, activeRoom),
     [visibleMessages, client, activeRoom]
   )
+
+  // Count thread replies per root event so we can show a "N replies" indicator.
+  const threadCounts = React.useMemo(() => {
+    const counts: Record<string, number> = {}
+    for (const ev of state.messages) {
+      const rel = ev.getContent()['m.relates_to']
+      if (rel?.rel_type === 'm.thread' && typeof rel.event_id === 'string') {
+        counts[rel.event_id] = (counts[rel.event_id] ?? 0) + 1
+      }
+    }
+    return counts
+  }, [state.messages])
 
   // Read system events directly from the room timeline
   const SYS_TYPES = ['m.room.member', 'm.room.name', 'm.room.topic', 'm.room.avatar']
@@ -2693,6 +2771,12 @@ export default function ChatArea({
                     </span>
                   </div>
                   <MessageContent event={group.events[0]} client={client} />
+                  {threadCounts[group.events[0].getId() ?? ''] > 0 && (
+                    <ThreadIndicator
+                      count={threadCounts[group.events[0].getId() ?? '']}
+                      onOpen={() => setThreadRootEvent(group.events[0])}
+                    />
+                  )}
                   <ReactionBar
                     eventId={group.events[0].getId() ?? ''}
                     onReact={emoji => sendReaction(group.events[0].getId() ?? '', emoji)}
@@ -2727,6 +2811,12 @@ export default function ChatArea({
                       {formatShortTime(event.getTs())}
                     </span>
                     <MessageContent event={event} client={client} />
+                    {threadCounts[event.getId() ?? ''] > 0 && (
+                      <ThreadIndicator
+                        count={threadCounts[event.getId() ?? '']}
+                        onOpen={() => setThreadRootEvent(event)}
+                      />
+                    )}
                     <ReactionBar
                       eventId={event.getId() ?? ''}
                       onReact={emoji => sendReaction(event.getId() ?? '', emoji)}
