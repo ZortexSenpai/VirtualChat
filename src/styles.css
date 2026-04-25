@@ -998,6 +998,17 @@ body {
   color: var(--text-muted);
 }
 
+.message-body a,
+.markdown-body a {
+  color: var(--text-link);
+  text-decoration: none;
+}
+
+.message-body a:hover,
+.markdown-body a:hover {
+  text-decoration: underline;
+}
+
 /* ---- Spoiler text ---- */
 
 .spoiler {
@@ -1151,6 +1162,7 @@ body {
   margin-top: 2px;
   display: flex;
   flex-direction: column;
+  align-items: flex-start;
 }
 
 [data-layout="bubble"] .message-avatar {
@@ -1158,6 +1170,8 @@ body {
   width: 28px;
   height: 28px;
   flex-shrink: 0;
+  align-self: flex-start;
+  order: -1;
 }
 
 [data-layout="bubble"] .message-avatar img,
@@ -2263,10 +2277,10 @@ body {
 }
 
 .modal-card {
-  background: rgba(12, 14, 30, 0.80);
+  background: var(--glass-modal);
   backdrop-filter: var(--glass-blur-lg);
   -webkit-backdrop-filter: var(--glass-blur-lg);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--glass-border-lg);
   border-radius: 20px;
   padding: 28px;
   width: 440px;
@@ -7601,11 +7615,11 @@ body {
 }
 
 [data-sidenav="classic"] .member-list {
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--glass-card);
   backdrop-filter: var(--glass-blur-sm);
   -webkit-backdrop-filter: var(--glass-blur-sm);
   border: none;
-  border-left: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 1px solid var(--glass-border);
   border-radius: 0;
   box-shadow: none;
 }
@@ -8606,10 +8620,10 @@ body {
 .thread-panel {
   width: 320px;
   flex-shrink: 0;
-  background: rgba(6, 7, 18, 0.60);
+  background: var(--glass-panel);
   backdrop-filter: var(--glass-blur-sm);
   -webkit-backdrop-filter: var(--glass-blur-sm);
-  border-left: 1px solid rgba(255, 255, 255, 0.07);
+  border-left: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -8621,9 +8635,9 @@ body {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+  border-bottom: 1px solid var(--glass-border);
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.025);
+  background: var(--glass-card);
 }
 
 .thread-panel-title {

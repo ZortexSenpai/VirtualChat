@@ -1,0 +1,7 @@
+- private chats cant be created in the home section when messaging a person
+- some elements still use the default theme colors instead of the selected theme (e.g. member view panel, thread panel, set status popup, room join popup, pinned messages popup, search in room popup) when using the "classic layout"
+- clickable links too dark / not themed correctly
+- user profile picture gets shifted to bottom right when bubbles as a theme is selected
+- reaction images are not displayed directly after reacting but only after a page reload
+- upload of gifs to sticker pack does not work (is not added to sticker pack)
+- a user cant mention another user in a chat

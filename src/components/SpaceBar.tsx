@@ -29,6 +29,13 @@ function getSpaceUnreadCount(space: Room, client: MatrixClient): number {
   return total
 }
 
+function getHomeUnreadCount(rooms: Room[], directRooms: Room[]): number {
+  let total = 0
+  for (const room of rooms) total += room.getUnreadNotificationCount()
+  for (const room of directRooms) total += room.getUnreadNotificationCount()
+  return total
+}
+
 /** Apply saved order: known-ordered ids first (in order), then any remaining spaces in default order. */
 function applyOrder(spaces: Room[], order: string[]): Room[] {
   if (order.length === 0) return spaces
@@ -57,6 +64,9 @@ export default function SpaceBar() {
     () => applyOrder(state.spaces, state.spaceOrder),
     [state.spaces, state.spaceOrder],
   )
+
+  const homeUnread = getHomeUnreadCount(state.rooms, state.directRooms)
+  const isHomeActive = state.activeSpaceId === null
 
   function handleDragStart(e: React.DragEvent<HTMLDivElement>, spaceId: string) {
     setDragId(spaceId)
@@ -97,17 +107,22 @@ export default function SpaceBar() {
     <div className="space-bar select-none">
       {/* Home / All rooms */}
       <div
-        className={`space-icon-wrap ${state.activeSpaceId === null ? 'active' : ''}`}
+        className={`space-icon-wrap ${isHomeActive ? 'active' : ''}`}
         onClick={() => setActiveSpace(null)}
         title="Home"
       >
         <div className="space-pill" />
-        <div className="space-icon" style={{ background: state.activeSpaceId === null ? '#5865f2' : undefined }}>
+        <div className="space-icon" style={{ background: isHomeActive ? '#5865f2' : undefined }}>
           <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M3 11.5 12 4l9 7.5" />
             <path d="M5 10.5V20a1 1 0 0 0 1 1h4v-6h4v6h4a1 1 0 0 0 1-1v-9.5" />
           </svg>
         </div>
+        {homeUnread > 0 && !isHomeActive && (
+          <span className="space-unread-badge">
+            {homeUnread > 99 ? '99+' : homeUnread}
+          </span>
+        )}
       </div>
 
       <div className="space-separator" />

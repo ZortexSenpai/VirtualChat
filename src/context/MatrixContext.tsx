@@ -48,6 +48,11 @@ export interface StickerPack {
   stickers: StickerItem[]
 }
 
+export interface MentionRef {
+  userId: string
+  displayName: string
+}
+
 /**
  * MSC2545 image-pack format (used by Element, Cinny, FluffyChat).
  * Items inherit `usage` from the pack if not set; we treat anything
@@ -307,7 +312,7 @@ interface MatrixContextValue {
   reorderSpaces: (orderedIds: string[]) => Promise<void>
   setActiveRoom: (roomId: string) => Promise<void>
   loadMoreMessages: () => Promise<void>
-  sendMessage: (text: string, replyTo?: MatrixEvent | null) => Promise<void>
+  sendMessage: (text: string, replyTo?: MatrixEvent | null, mentions?: MentionRef[]) => Promise<void>
   sendReaction: (eventId: string, key: string) => Promise<void>
   sendGif: (gifUrl: string, title: string) => Promise<void>
   updateAvatar: (file: File) => Promise<void>
@@ -438,6 +443,34 @@ function formatFields(text: string): { format?: string; formatted_body?: string 
   if (!changed) return null
   // Convert newlines to <br> for HTML
   html = html.replace(/\n/g, '<br>')
+  return { format: 'org.matrix.custom.html', formatted_body: html }
+}
+
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;')
+}
+
+/**
+ * Splice mention pills into the formatted body. We do markdown formatting
+ * first, then walk through the user-supplied mentions and replace the literal
+ * `@<displayName>` substring (first occurrence) with a `matrix.to` anchor.
+ * If the body had no markdown to begin with, we synthesise an HTML body so
+ * the mention still renders as a pill on the receiving side.
+ */
+function buildFormatted(
+  text: string,
+  mentions: MentionRef[] | undefined,
+): { format?: string; formatted_body?: string } | null {
+  const formatted = formatFields(text)
+  if (!mentions || mentions.length === 0) return formatted
+  let html = formatted?.formatted_body ?? text.replace(/\n/g, '<br>')
+  for (const m of mentions) {
+    const needle = `@${m.displayName}`
+    const idx = html.indexOf(needle)
+    if (idx < 0) continue
+    const pill = `<a href="https://matrix.to/#/${escapeHtml(m.userId)}">${escapeHtml(needle)}</a>`
+    html = html.slice(0, idx) + pill + html.slice(idx + needle.length)
+  }
   return { format: 'org.matrix.custom.html', formatted_body: html }
 }
 
@@ -846,6 +879,20 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
     client.on(RoomEvent.LocalEchoUpdated, (event: MatrixEvent, room: Room) => {
       if (event.status !== null) return
       const t = event.getType()
+      if (t === 'm.reaction') {
+        const rel = event.getContent()['m.relates_to']
+        if (rel?.rel_type === 'm.annotation' && rel.event_id && rel.key) {
+          dispatch({
+            type: 'APPEND_REACTION',
+            reactionEventId: event.getId() ?? '',
+            eventId: rel.event_id,
+            key: rel.key,
+            senderId: event.getSender() ?? '',
+            myUserId: client.getUserId() ?? '',
+          })
+        }
+        return
+      }
       if (t !== EventType.RoomMessage && t !== EventType.Sticker && t !== 'm.poll.start' && t !== 'org.matrix.msc3381.poll.start') return
       if (event.getContent()['m.relates_to']?.rel_type === 'm.replace') return
       dispatch({ type: 'APPEND_MESSAGE', message: event, roomId: room.roomId })
@@ -854,14 +901,22 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
 
     client.on(RoomEvent.Name, () => refreshRooms())
     client.on(RoomEvent.MyMembership, () => refreshRooms())
+    client.on(ClientEvent.Room, () => refreshRooms())
 
     // Space order updated from another device → apply here too.
+    // Also listen for m.direct so newly created DMs propagate into the Home view.
     client.on(ClientEvent.AccountData, (event: MatrixEvent) => {
-      if (event.getType() !== 'vc.space_order') return
-      const content = event.getContent() as { order?: unknown }
-      if (Array.isArray(content.order) && content.order.every(x => typeof x === 'string')) {
-        dispatch({ type: 'SET_SPACE_ORDER', order: content.order as string[] })
-        try { localStorage.setItem('vc_space_order', JSON.stringify(content.order)) } catch { /* ignore */ }
+      const eventType = event.getType()
+      if (eventType === 'vc.space_order') {
+        const content = event.getContent() as { order?: unknown }
+        if (Array.isArray(content.order) && content.order.every(x => typeof x === 'string')) {
+          dispatch({ type: 'SET_SPACE_ORDER', order: content.order as string[] })
+          try { localStorage.setItem('vc_space_order', JSON.stringify(content.order)) } catch { /* ignore */ }
+        }
+        return
+      }
+      if (eventType === 'm.direct') {
+        refreshRooms()
       }
     })
     client.on(RoomMemberEvent.Membership, (_event: MatrixEvent, member: RoomMember) => {
@@ -1190,15 +1245,19 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
     }
   }
 
-  async function sendMessage(text: string, replyTo?: MatrixEvent | null) {
+  async function sendMessage(text: string, replyTo?: MatrixEvent | null, mentions?: MentionRef[]) {
     const client = clientRef.current
     const roomId = activeRoomIdRef.current
     if (!client || !roomId || !text.trim()) return
     const trimmed = text.trim()
+    const liveMentions = (mentions ?? []).filter(m => trimmed.includes(`@${m.displayName}`))
     const content: any = {
       msgtype: MsgType.Text,
       body: trimmed,
-      ...formatFields(trimmed),
+      ...buildFormatted(trimmed, liveMentions),
+    }
+    if (liveMentions.length > 0) {
+      content['m.mentions'] = { user_ids: Array.from(new Set(liveMentions.map(m => m.userId))) }
     }
     if (replyTo) {
       const replyId = replyTo.getId() ?? ''
@@ -1374,6 +1433,21 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
     // Register the new room as a DM in account data
     const updated: Record<string, string[]> = { ...dmContent, [targetUserId]: [...(dmContent[targetUserId] ?? []), roomId] }
     await client.setAccountData('m.direct' as any, updated as any)
+    // The Room object may not be in client state yet — wait until the sync surfaces it
+    // so refreshRooms() and setActiveRoom() can find it.
+    if (!client.getRoom(roomId)) {
+      await new Promise<void>(resolve => {
+        const timeout = setTimeout(() => { client.off(ClientEvent.Room, handler); resolve() }, 5000)
+        const handler = (room: Room) => {
+          if (room.roomId === roomId) {
+            clearTimeout(timeout)
+            client.off(ClientEvent.Room, handler)
+            resolve()
+          }
+        }
+        client.on(ClientEvent.Room, handler)
+      })
+    }
     refreshRooms()
     return roomId
   }

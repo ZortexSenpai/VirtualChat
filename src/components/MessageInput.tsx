@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useLayoutEffect, useMemo, KeyboardEvent } from 'react'
 import { MatrixEvent } from 'matrix-js-sdk'
 import { useMatrix } from '../context/MatrixContext'
-import type { StickerPack, StickerItem, PollAnswer } from '../context/MatrixContext'
+import type { StickerPack, StickerItem, PollAnswer, MentionRef } from '../context/MatrixContext'
 import GifPicker from './GifPicker'
 import { useMxcBlobUrl } from './MxcAvatar'
 import LocationShareModal from './LocationShareModal'
@@ -447,6 +447,7 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
     const roomId = state.activeRoomId
     if (editingEvent) return
     lastRoomIdRef.current = roomId
+    setPendingMentions([])
     if (!roomId) { setText(''); return }
     const draft = localStorage.getItem(DRAFT_KEY(roomId)) ?? ''
     setText(draft)
@@ -519,6 +520,13 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
   const [cursorPos, setCursorPos] = useState(0)
   const [emojiPaletteIndex, setEmojiPaletteIndex] = useState(0)
 
+  // --- Mention autocomplete ("@user") state ---
+  // pendingMentions tracks display-name → userId for mentions inserted via the
+  // picker, so sendMessage can serialise them as Matrix m.mentions + HTML pills.
+  // Reset whenever the composer is cleared.
+  const [pendingMentions, setPendingMentions] = useState<MentionRef[]>([])
+  const [mentionPaletteIndex, setMentionPaletteIndex] = useState(0)
+
   const activeRoom = state.activeRoomId ? client?.getRoom(state.activeRoomId) ?? null : null
   const roomEmoteMap: Record<string, RoomEmote> = useMemo(
     () => activeRoom ? getRoomEmoteMap(activeRoom) : {},
@@ -575,6 +583,68 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
     const newText = text.slice(0, emojiQuery.start) + replacement + text.slice(emojiQuery.end)
     const newCursor = emojiQuery.start + replacement.length
     setText(newText)
+    requestAnimationFrame(() => {
+      const ta = textareaRef.current
+      if (!ta) return
+      ta.focus()
+      ta.setSelectionRange(newCursor, newCursor)
+      setCursorPos(newCursor)
+    })
+  }
+
+  // Detect a "@token" at the cursor. Same lead-in rules as emoji, minus the
+  // colon-vs-time-syntax dance: we just want word characters.
+  const mentionQuery = useMemo(() => {
+    if (!text || editingEvent) return null
+    if (cursorPos === 0) return null
+    const before = text.slice(0, cursorPos)
+    const match = before.match(/(?:^|[\s(])(@([A-Za-z0-9_\-.]{0,32}))$/)
+    if (!match) return null
+    const start = cursorPos - match[1].length
+    return { start, end: cursorPos, query: match[2] }
+  }, [text, cursorPos, editingEvent])
+
+  interface MentionPaletteItem {
+    userId: string
+    displayName: string
+    avatarMxc: string | null
+  }
+
+  const mentionMatches = useMemo<MentionPaletteItem[]>(() => {
+    if (!mentionQuery || !activeRoom) return []
+    const q = mentionQuery.query.toLowerCase()
+    const members = activeRoom.getJoinedMembers()
+    const out: MentionPaletteItem[] = []
+    for (const m of members) {
+      const name = (m.name ?? '').toLowerCase()
+      const id = m.userId.toLowerCase()
+      if (q === '' || name.includes(q) || id.includes(q)) {
+        out.push({
+          userId: m.userId,
+          displayName: m.name || m.userId.replace(/^@/, '').split(':')[0],
+          avatarMxc: m.getMxcAvatarUrl() ?? null,
+        })
+      }
+      if (out.length >= 8) break
+    }
+    return out
+  }, [mentionQuery, activeRoom])
+
+  useEffect(() => {
+    setMentionPaletteIndex(i => (mentionMatches.length === 0 ? 0 : Math.min(i, mentionMatches.length - 1)))
+  }, [mentionMatches.length])
+
+  function completeMention(item: MentionPaletteItem) {
+    if (!mentionQuery) return
+    const replacement = `@${item.displayName} `
+    const newText = text.slice(0, mentionQuery.start) + replacement + text.slice(mentionQuery.end)
+    const newCursor = mentionQuery.start + replacement.length
+    setText(newText)
+    setPendingMentions(prev => {
+      // Avoid duplicate entries when the same user is tagged twice.
+      if (prev.some(p => p.userId === item.userId && p.displayName === item.displayName)) return prev
+      return [...prev, { userId: item.userId, displayName: item.displayName }]
+    })
     requestAnimationFrame(() => {
       const ta = textareaRef.current
       if (!ta) return
@@ -689,11 +759,12 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
         const body = localStorage.getItem('vc_autoformat_json') === 'true'
           ? autoformatJsonBlocks(text)
           : text
-        await sendMessage(body, state.replyTo)
+        await sendMessage(body, state.replyTo, pendingMentions)
       }
       clearAttachments()
       sendTypingNotification(false)
       setText('')
+      setPendingMentions([])
     } catch (err) {
       console.error('Send failed:', err)
     } finally {
@@ -741,6 +812,30 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
       }
       if (e.key === 'Escape') {
         // Close the palette without sending / cancelling reply etc.
+        e.preventDefault()
+        setCursorPos(-1)
+        return
+      }
+    }
+    const mentionOpen = mentionMatches.length > 0 && mentionQuery
+    if (mentionOpen) {
+      if (e.key === 'ArrowDown') {
+        e.preventDefault()
+        setMentionPaletteIndex(i => (i + 1) % mentionMatches.length)
+        return
+      }
+      if (e.key === 'ArrowUp') {
+        e.preventDefault()
+        setMentionPaletteIndex(i => (i - 1 + mentionMatches.length) % mentionMatches.length)
+        return
+      }
+      if (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey)) {
+        e.preventDefault()
+        const item = mentionMatches[mentionPaletteIndex]
+        if (item) completeMention(item)
+        return
+      }
+      if (e.key === 'Escape') {
         e.preventDefault()
         setCursorPos(-1)
         return
@@ -883,6 +978,41 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
 
       {recording && (
         <VoiceRecorder onCancel={() => setRecording(false)} onSend={handleVoiceSend} />
+      )}
+
+      {mentionQuery && mentionMatches.length > 0 && (
+        <div className="command-palette command-palette--mention" role="listbox" aria-label="Mention user">
+          {mentionMatches.map((item, i) => {
+            const httpUrl = item.avatarMxc
+              ? (client as any)?.mxcUrlToHttp(item.avatarMxc, 24, 24, 'scale', false, true)
+              : null
+            return (
+              <button
+                key={item.userId}
+                type="button"
+                className={`command-palette-item${i === mentionPaletteIndex ? ' selected' : ''}`}
+                onMouseEnter={() => setMentionPaletteIndex(i)}
+                onMouseDown={e => { e.preventDefault(); completeMention(item) }}
+                role="option"
+                aria-selected={i === mentionPaletteIndex}
+              >
+                <span className="emoji-palette-glyph">
+                  {httpUrl
+                    ? <img src={httpUrl} alt="" className="emoji-palette-img" />
+                    : <span className="avatar-placeholder" style={{ background: '#5865f2', borderRadius: '50%', width: 20, height: 20, fontSize: 11 }}>{item.displayName.charAt(0).toUpperCase()}</span>}
+                </span>
+                <span className="command-palette-name">{item.displayName}</span>
+                <span className="command-palette-desc">{item.userId}</span>
+              </button>
+            )
+          })}
+          <div className="command-palette-footer">
+            <kbd>Tab</kbd> complete
+            <kbd>↑↓</kbd> navigate
+            <kbd>Enter</kbd> insert
+            <kbd>Esc</kbd> close
+          </div>
+        </div>
       )}
 
       {emojiQuery && emojiMatches.length > 0 && (

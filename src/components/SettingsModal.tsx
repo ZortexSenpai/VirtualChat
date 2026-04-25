@@ -2150,13 +2150,25 @@ function StickerPacksTab() {
     if (!client) return
     setUploading(true)
     try {
-      const resp = await (client as any).uploadContent(file, { type: file.type })
+      // Browsers occasionally hand us a File with an empty `type`, especially for
+      // .gif drag-and-drops. Fall back to extension sniffing so the upload sets
+      // a proper Content-Type and the sticker is later recognised as animated.
+      let mimetype = file.type
+      if (!mimetype) {
+        const ext = file.name.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1]
+        if (ext === 'gif') mimetype = 'image/gif'
+        else if (ext === 'webp') mimetype = 'image/webp'
+        else if (ext === 'png') mimetype = 'image/png'
+        else if (ext === 'jpg' || ext === 'jpeg') mimetype = 'image/jpeg'
+        else mimetype = 'application/octet-stream'
+      }
+      const resp = await (client as any).uploadContent(file, { type: mimetype })
       const mxcUrl: string = resp.content_uri
       const newSticker: StickerItem = {
         id: `${Date.now()}`,
         body: file.name.replace(/\.[^.]+$/, ''),
         url: mxcUrl,
-        mimetype: file.type,
+        mimetype,
       }
       await saveAll(packs.map(p => p.id === packId ? { ...p, stickers: [...p.stickers, newSticker] } : p))
     } catch (e: any) {
