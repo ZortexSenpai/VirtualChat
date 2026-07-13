@@ -116,6 +116,23 @@ html[data-glass="off"] body {
   background: var(--glass-panel);
 }
 
+/* Light themes + glass off: the dark fallbacks above would paint a dark page
+   under light panels. Use the theme's own background scale instead — mirroring
+   the dark glass-off look (panels match the body, sidebar a step darker,
+   floats/modals a step lighter). The html[…] prefix outranks both the
+   generic [data-glass="off"] block and the :root[data-theme="…"] token
+   blocks defined later in the file. */
+html[data-theme-mode="light"][data-glass="off"] {
+  --glass-sidebar: var(--bg-2);
+  --glass-panel:   var(--bg-1);
+  --glass-float:   var(--bg-4);
+  --glass-modal:   var(--bg-1);
+}
+
+html[data-theme-mode="light"][data-glass="off"] body {
+  background: var(--bg-1);
+}
+
 /* Channel sidebar + member list + unified space-bar paint their
    --glass-shadow directly onto the flat body (chat-main's same shadow is
    clipped by chat-area's overflow:hidden, so it stays invisible). Drop
@@ -4965,6 +4982,59 @@ body {
 }
 
 /* Light mode overrides for hardcoded dark glass components */
+
+/* The chat pane hardcodes a translucent dark wash (rgba(8,9,20,0.45)) that
+   reads as a darkened overlay on light themes; use the theme's panel tint. */
+[data-theme-mode="light"] .chat-main {
+  background: var(--glass-panel);
+}
+
+/* Floating popovers whose dark glass background is hardcoded (not tokenized):
+   emoji/reaction picker, message hover actions, profile popup, GIF picker,
+   room context menu. --glass-float is theme-defined, so each light theme
+   keeps its own tint (and the glass-off override makes it opaque). */
+[data-theme-mode="light"] .reaction-picker,
+[data-theme-mode="light"] .message-actions,
+[data-theme-mode="light"] .profile-popup,
+[data-theme-mode="light"] .gif-picker,
+[data-theme-mode="light"] .quick-switcher,
+[data-theme-mode="light"] .room-ctx-menu {
+  background: var(--glass-float);
+  border-color: var(--glass-border-lg);
+}
+
+[data-theme-mode="light"] .room-ctx-menu {
+  box-shadow: var(--glass-shadow-lg);
+}
+
+[data-theme-mode="light"] .verification-modal,
+[data-theme-mode="light"] .room-settings-modal {
+  background: var(--glass-modal);
+  border-color: var(--glass-border-lg);
+  box-shadow: var(--glass-shadow-lg);
+}
+
+/* White-tint separators and inputs inside those popovers flip to black tints */
+[data-theme-mode="light"] .reaction-picker-search {
+  border-bottom-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme-mode="light"] .reaction-picker-section-label {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
+[data-theme-mode="light"] .reaction-picker-section-label:first-of-type {
+  border-top: none;
+}
+
+[data-theme-mode="light"] .reaction-picker-input {
+  border-color: rgba(0, 0, 0, 0.10);
+}
+
+[data-theme-mode="light"] .profile-popup-section {
+  border-top-color: rgba(0, 0, 0, 0.08);
+}
+
 [data-theme-mode="light"] .settings-modal {
   background: var(--bg-1);
   box-shadow: 0 32px 80px rgba(0, 0, 0, 0.18), 0 0 0 1px rgba(0, 0, 0, 0.08);
