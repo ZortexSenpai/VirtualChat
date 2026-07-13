@@ -4,6 +4,7 @@
  */
 
 import type { MatrixClient, MatrixEvent, Room } from 'matrix-js-sdk'
+import { getRoomAvatarMxc } from './roomAvatar'
 
 const DESKTOP_NOTIFICATIONS_KEY = 'vc_desktop_notifications'
 const NOTIFICATION_SOUND_KEY = 'vc_notification_sound'
@@ -414,7 +415,7 @@ export function handleIncomingEvent(
   const body = (content.body as string) || (event.getType() === 'm.sticker' ? 'Sticker' : 'New message')
 
   // Resolve room avatar for the notification icon
-  const roomAvatarMxc = room.getMxcAvatarUrl()
+  const roomAvatarMxc = getRoomAvatarMxc(room)
   const iconUrl = roomAvatarMxc
     ? (client.mxcUrlToHttp(roomAvatarMxc, 64, 64, 'crop') || undefined)
     : undefined

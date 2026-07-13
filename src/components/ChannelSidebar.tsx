@@ -8,6 +8,7 @@ import RoomSettingsModal from './RoomSettingsModal'
 import RoomDirectory from './RoomDirectory'
 import SpaceLobby from './SpaceLobby'
 import { isVoiceChannel } from '../services/roomKind'
+import { getRoomAvatarMxc } from '../services/roomAvatar'
 import { useTranslation } from '../services/i18n'
 
 function VoiceChannelIcon() {
@@ -522,7 +523,7 @@ export default function ChannelSidebar() {
                   const isActive = state.activeRoomId === room.roomId
                   const name = room.name || room.roomId
                   const isDM = state.directRooms.some(d => d.roomId === room.roomId)
-                  const avatarMxc = room.getMxcAvatarUrl() ?? null
+                  const avatarMxc = getRoomAvatarMxc(room)
                   return (
                     <div
                       key={room.roomId}
@@ -565,6 +566,12 @@ export default function ChannelSidebar() {
                 <button className="explore-rooms-btn" onClick={() => setShowSpaceLobby(true)}>
                   <ExploreIcon />
                   <span>Browse channels in this space</span>
+                </button>
+              )}
+              {state.activeSpaceId === null && (
+                <button className="explore-rooms-btn" onClick={() => setShowNewDM(true)}>
+                  <PlusIcon />
+                  <span>{t('sidebar.newDm')}</span>
                 </button>
               )}
             </>
@@ -630,7 +637,7 @@ export default function ChannelSidebar() {
                   {dms.map(room => {
                     const isActive = state.activeRoomId === room.roomId
                     const name = room.name || room.roomId
-                    const avatarMxc = room.getMxcAvatarUrl() ?? null
+                    const avatarMxc = getRoomAvatarMxc(room)
                     const highlights = room.getUnreadNotificationCount(NotificationCountType.Highlight)
                     const total = room.getUnreadNotificationCount(NotificationCountType.Total)
                     return (

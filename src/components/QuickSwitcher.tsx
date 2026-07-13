@@ -3,6 +3,7 @@ import { Room } from 'matrix-js-sdk'
 import { useMatrix } from '../context/MatrixContext'
 import MxcAvatar from './MxcAvatar'
 import { isVoiceChannel } from '../services/roomKind'
+import { getRoomAvatarMxc } from '../services/roomAvatar'
 
 interface SwitchEntry {
   room: Room
@@ -78,7 +79,7 @@ export default function QuickSwitcher() {
         room,
         name: room.name,
         kind,
-        avatarMxc: room.getMxcAvatarUrl() ?? null,
+        avatarMxc: getRoomAvatarMxc(room),
         parentSpaceName: parentSpaceByRoomId.get(room.roomId),
       })
     }
