@@ -94,9 +94,61 @@ function renderFormattedSpoilers(html: string): React.ReactNode | null {
 
 // ---- Pinned Messages Modal ----
 
+interface PinnedItem {
+  id: string
+  sender: string
+  type: string
+  content: any
+  ts: number
+}
+
+function PinnedItemBody({ item, client }: { item: PinnedItem; client: any }) {
+  const c = item.content ?? {}
+  const msgtype = c.msgtype
+  const isSticker = item.type === 'm.sticker'
+
+  if (isSticker || msgtype === 'm.image') {
+    const encryptedFile = c.file as EncryptedFileInfo | undefined
+    const rawUrl = (c.url ?? encryptedFile?.url) as string | undefined
+    if (rawUrl?.startsWith('mxc://') && client) {
+      return (
+        <div className="pinned-item-media">
+          <MessageImage
+            mxcUrl={rawUrl}
+            alt={c.body || 'image'}
+            client={client}
+            mimetype={c.info?.mimetype}
+            forceDownload={isSticker}
+            encryptedFile={encryptedFile}
+          />
+        </div>
+      )
+    }
+    return <div className="pinned-item-body">[image]</div>
+  }
+
+  if (msgtype === 'm.video' || msgtype === 'm.audio' || msgtype === 'm.file') {
+    const label = msgtype === 'm.video' ? 'Video' : msgtype === 'm.audio' ? 'Audio' : 'File'
+    return <div className="pinned-item-body pinned-item-attachment">{label}{c.body ? `: ${c.body}` : ''}</div>
+  }
+
+  // Text-like messages: render through markdown like the timeline does, so
+  // code fences, quotes, and links look the same as in chat.
+  let body: string = c.body ?? ''
+  if (c['m.relates_to']?.['m.in_reply_to']) {
+    body = body.replace(/^(>[^\n]*\n)*\n/, '')
+  }
+  body = body.replace(/(?<!\n)\n(?!\n)/g, '  \n')
+  return (
+    <div className="pinned-item-body markdown-body">
+      <ReactMarkdown>{body}</ReactMarkdown>
+    </div>
+  )
+}
+
 function PinnedMessagesModal({ roomId, onClose }: { roomId: string; onClose: () => void }) {
   const { client } = useMatrix()
-  const [items, setItems] = useState<Array<{ id: string; sender: string; body: string; ts: number } | null>>([])
+  const [items, setItems] = useState<Array<PinnedItem | null>>([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -108,10 +160,12 @@ function PinnedMessagesModal({ roomId, onClose }: { roomId: string; onClose: () 
     Promise.all(pinned.map(async (eventId) => {
       const local = room.findEventById(eventId)
       if (local && !local.isRedacted()) {
+        const replacement = local.replacingEvent() as MatrixEvent | null
         return {
           id: eventId,
           sender: local.getSender()?.replace(/^@/, '').split(':')[0] ?? 'Unknown',
-          body: local.getContent().body ?? '',
+          type: local.getType(),
+          content: replacement?.getContent()?.['m.new_content'] ?? local.getContent(),
           ts: local.getTs(),
         }
       }
@@ -120,7 +174,8 @@ function PinnedMessagesModal({ roomId, onClose }: { roomId: string; onClose: () 
         return {
           id: eventId,
           sender: (raw.sender ?? '').replace(/^@/, '').split(':')[0] || 'Unknown',
-          body: raw.content?.body ?? '',
+          type: raw.type ?? '',
+          content: raw.content ?? {},
           ts: raw.origin_server_ts ?? 0,
         }
       } catch {
@@ -132,7 +187,7 @@ function PinnedMessagesModal({ roomId, onClose }: { roomId: string; onClose: () 
     })
   }, [client, roomId])
 
-  const valid = items.filter(Boolean) as { id: string; sender: string; body: string; ts: number }[]
+  const valid = items.filter(Boolean) as PinnedItem[]
 
   return (
     <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
@@ -152,7 +207,7 @@ function PinnedMessagesModal({ roomId, onClose }: { roomId: string; onClose: () 
                     {e.ts ? new Date(e.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
                   </span>
                 </div>
-                <div className="pinned-item-body">{e.body}</div>
+                <PinnedItemBody item={e} client={client} />
               </div>
             ))}
           </div>
