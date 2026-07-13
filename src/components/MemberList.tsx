@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { RoomMember, RoomStateEvent, ClientEvent } from 'matrix-js-sdk'
 import { useMatrix } from '../context/MatrixContext'
-import MxcAvatar from './MxcAvatar'
+import MxcAvatar, { useMxcBlobUrl } from './MxcAvatar'
 import { ProfilePopup, ProfileInfo } from './ProfilePopup'
 import { useTranslation } from '../services/i18n'
 
@@ -27,6 +27,40 @@ function roleLabelForPowerLevel(pl: number): string | null {
   if (pl >= 100) return 'Admin'
   if (pl >= 50) return 'Mod'
   return null
+}
+
+// Session-scoped banner cache: userId → banner mxc (null = user has none).
+// fetchUserBanner() does a full profile GET per call, so without this the
+// member list would hit /profile/{userId} for every row on every room switch.
+// ProfilePopup keeps fetching fresh on open, so a stale entry here only
+// affects the list until reload.
+const bannerMxcCache = new Map<string, string | null>()
+const bannerInflight = new Map<string, Promise<string | null>>()
+
+function useUserBannerMxc(userId: string): string | null {
+  const { fetchUserBanner } = useMatrix()
+  const [mxc, setMxc] = useState<string | null>(() => bannerMxcCache.get(userId) ?? null)
+
+  useEffect(() => {
+    if (bannerMxcCache.has(userId)) {
+      setMxc(bannerMxcCache.get(userId) ?? null)
+      return
+    }
+    let cancelled = false
+    let pending = bannerInflight.get(userId)
+    if (!pending) {
+      pending = fetchUserBanner(userId).then(res => {
+        bannerMxcCache.set(userId, res)
+        bannerInflight.delete(userId)
+        return res
+      })
+      bannerInflight.set(userId, pending)
+    }
+    pending.then(res => { if (!cancelled) setMxc(res) })
+    return () => { cancelled = true }
+  }, [userId, fetchUserBanner])
+
+  return mxc
 }
 
 function MemberItem({
@@ -55,8 +89,20 @@ function MemberItem({
 
   const roleLabel = roleLabelForPowerLevel(member.powerLevel)
 
+  // Same params as ProfilePopup's banner so both share one cached blob. A
+  // proportional 'scale' thumbnail + CSS background-size: cover avoids the
+  // distorted results homeservers produce for extreme 'crop' aspect ratios.
+  const bannerMxc = useUserBannerMxc(member.userId)
+  const bannerUrl = useMxcBlobUrl(bannerMxc, 480, 96)
+
   return (
-    <div className="member-item" title={member.userId} onClick={handleClick} style={{ cursor: 'pointer' }}>
+    <div
+      className={`member-item${bannerUrl ? ' member-item--banner' : ''}`}
+      title={member.userId}
+      onClick={handleClick}
+      style={{ cursor: 'pointer' }}
+    >
+      {bannerUrl && <div className="member-item-banner" style={{ backgroundImage: `url(${bannerUrl})` }} />}
       <div className="member-avatar-wrap">
         <div className="member-avatar">
           <MxcAvatar mxcUrl={avatarMxc} size={32} name={displayName} />

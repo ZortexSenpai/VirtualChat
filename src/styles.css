@@ -2087,6 +2087,7 @@ body {
 }
 
 .member-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2099,6 +2100,34 @@ body {
 
 .member-item:hover {
   background: var(--bg-hover);
+}
+
+/* Profile banner behind the member row. The gradient fades the image into the
+   theme background toward the left, where the name sits. */
+.member-item-banner {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+
+.member-item-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(to right, var(--bg-2) 30%, transparent 100%);
+}
+
+.member-item--banner:hover .member-item-banner {
+  filter: brightness(1.15);
+}
+
+/* Keep the row content above the absolutely-positioned banner layer. */
+.member-item > .member-info {
+  position: relative;
 }
 
 .member-avatar-wrap {
