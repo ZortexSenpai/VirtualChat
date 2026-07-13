@@ -1572,6 +1572,10 @@ body {
   color: var(--header-primary);
   margin-bottom: 2px;
   letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .profile-popup-id {
@@ -3159,6 +3163,33 @@ body {
 /* ---- Profile popup kick action ---- */
 .profile-popup-actions {
   padding: 0 12px 12px;
+}
+
+.profile-popup-dm-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.profile-popup-dm-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.profile-popup-dm-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .profile-popup-kick-btn {

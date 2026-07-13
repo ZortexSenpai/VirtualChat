@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import MxcAvatar, { useMxcBlobUrl } from './MxcAvatar'
 import { useMatrix } from '../context/MatrixContext'
+import { useTranslation } from '../services/i18n'
 
 export interface ProfileInfo {
   userId: string
@@ -9,6 +10,42 @@ export interface ProfileInfo {
   anchorRect: DOMRect
   roomId?: string
   myUserId?: string
+  /** Power level from the caller's member data; falls back to room state when omitted. */
+  powerLevel?: number
+}
+
+function roleLabelForPowerLevel(pl: number): string | null {
+  if (pl >= 100) return 'Admin'
+  if (pl >= 50) return 'Mod'
+  return null
+}
+
+/**
+ * Shared "open a DM with this user" action: creates (or reuses) the direct
+ * room, switches to the Home view — DMs are only listed there — and makes it
+ * the active room. Returns the room id, or null on failure.
+ */
+export function useStartDm() {
+  const { state, createDM, setActiveRoom, setActiveSpace } = useMatrix()
+  const [startingDmFor, setStartingDmFor] = useState<string | null>(null)
+
+  async function startDm(userId: string): Promise<string | null> {
+    if (startingDmFor) return null
+    setStartingDmFor(userId)
+    try {
+      const dmRoomId = await createDM(userId)
+      if (state.activeSpaceId !== null) setActiveSpace(null)
+      await setActiveRoom(dmRoomId)
+      return dmRoomId
+    } catch (err) {
+      console.error('Failed to start DM:', err)
+      return null
+    } finally {
+      setStartingDmFor(null)
+    }
+  }
+
+  return { startDm, startingDmFor }
 }
 
 const ROLES = [
@@ -19,7 +56,10 @@ const ROLES = [
 
 export function ProfilePopup({ info, onClose }: { info: ProfileInfo; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
+  const { t } = useTranslation()
   const { state, client, kickMember, setPowerLevel, banMember, ignoreUser, unignoreUser, fetchUserBanner } = useMatrix()
+  const { startDm, startingDmFor } = useStartDm()
+  const [dmError, setDmError] = useState<string | null>(null)
 
   const [bannerMxc, setBannerMxc] = useState<string | null>(
     info.userId === state.userId ? state.myBannerMxc : null,
@@ -83,9 +123,11 @@ export function ProfilePopup({ info, onClose }: { info: ProfileInfo; onClose: ()
     }
   }
 
+  const roleChip = roleLabelForPowerLevel(info.powerLevel ?? targetPl)
+
   const POPUP_WIDTH = 280
-  // Reserve space for role + kick + ban sections so the popup doesn't clip off-screen
-  const popupH = 160 + (canChangeRole ? 80 : 0) + (canKick ? 60 : 0) + (canBan ? 60 : 0)
+  // Reserve space for message + role + kick + ban sections so the popup doesn't clip off-screen
+  const popupH = 160 + (info.userId !== state.userId ? 50 : 0) + (canChangeRole ? 80 : 0) + (canKick ? 60 : 0) + (canBan ? 60 : 0)
   const top = Math.min(info.anchorRect.top, window.innerHeight - popupH - 8)
   const spaceRight = window.innerWidth - info.anchorRect.right
   const left = spaceRight >= POPUP_WIDTH + 16
@@ -136,6 +178,13 @@ export function ProfilePopup({ info, onClose }: { info: ProfileInfo; onClose: ()
   const isIgnored = state.ignoredUserIds.includes(info.userId)
   const isSelf = info.userId === state.userId
 
+  async function handleMessage() {
+    setDmError(null)
+    const dmRoomId = await startDm(info.userId)
+    if (dmRoomId) onClose()
+    else setDmError('Failed to open DM')
+  }
+
   async function handleToggleIgnore() {
     setTogglingIgnore(true)
     try {
@@ -159,9 +208,29 @@ export function ProfilePopup({ info, onClose }: { info: ProfileInfo; onClose: ()
         <MxcAvatar mxcUrl={info.avatarMxc} size={64} name={info.displayName} />
       </div>
       <div className="profile-popup-body">
-        <div className="profile-popup-name">{info.displayName}</div>
+        <div className="profile-popup-name">
+          {info.displayName}
+          {roleChip && (
+            <span className={`member-role-badge member-role-badge--${roleChip.toLowerCase()}`}>
+              {roleChip}
+            </span>
+          )}
+        </div>
         <div className="profile-popup-id">{info.userId}</div>
       </div>
+
+      {!isSelf && (
+        <div className="profile-popup-actions">
+          <button
+            className="profile-popup-dm-btn"
+            onClick={handleMessage}
+            disabled={startingDmFor !== null}
+          >
+            <MessageIcon /> {startingDmFor ? 'Opening…' : t('members.message')}
+          </button>
+          {dmError && <p className="profile-popup-role-error">{dmError}</p>}
+        </div>
+      )}
 
       {canChangeRole && (
         <div className="profile-popup-section">
@@ -260,6 +329,14 @@ export function ProfilePopup({ info, onClose }: { info: ProfileInfo; onClose: ()
         </div>
       )}
     </div>
+  )
+}
+
+export function MessageIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+    </svg>
   )
 }
 

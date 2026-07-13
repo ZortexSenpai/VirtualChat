@@ -65,6 +65,7 @@ const de: Record<string, string> = {
   'members.onlineCount': 'Online — {count}',
   'members.membersCount': 'Mitglieder — {count}',
   'members.loading': 'Mitglieder werden geladen…',
+  'members.message': 'Nachricht senden',
 
   // Settings tabs
   'settings.tabs.account': 'Konto',

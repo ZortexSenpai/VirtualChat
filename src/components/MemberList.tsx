@@ -23,12 +23,6 @@ function getPresenceCls(presence: string | undefined): string {
   return 'offline'
 }
 
-function roleLabelForPowerLevel(pl: number): string | null {
-  if (pl >= 100) return 'Admin'
-  if (pl >= 50) return 'Mod'
-  return null
-}
-
 // Session-scoped banner cache: userId → banner mxc (null = user has none).
 // fetchUserBanner() does a full profile GET per call, so without this the
 // member list would hit /profile/{userId} for every row on every room switch.
@@ -84,10 +78,8 @@ function MemberItem({
 
   function handleClick(e: React.MouseEvent) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
-    onOpenProfile({ userId: member.userId, displayName, avatarMxc, anchorRect: rect, roomId, myUserId })
+    onOpenProfile({ userId: member.userId, displayName, avatarMxc, anchorRect: rect, roomId, myUserId, powerLevel: member.powerLevel })
   }
-
-  const roleLabel = roleLabelForPowerLevel(member.powerLevel)
 
   // Same params as ProfilePopup's banner so both share one cached blob. A
   // proportional 'scale' thumbnail + CSS background-size: cover avoids the
@@ -111,14 +103,7 @@ function MemberItem({
       </div>
 
       <div className="member-info">
-        <div className="member-name">
-          {displayName}
-          {roleLabel && (
-            <span className={`member-role-badge member-role-badge--${roleLabel.toLowerCase()}`}>
-              {roleLabel}
-            </span>
-          )}
-        </div>
+        <div className="member-name">{displayName}</div>
         {statusMsg && <div className="member-status-text">{statusMsg}</div>}
       </div>
     </div>
