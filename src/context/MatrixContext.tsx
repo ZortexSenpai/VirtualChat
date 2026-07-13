@@ -50,6 +50,7 @@ export interface StickerPack {
 
 export interface MentionRef {
   userId: string
+  /** The text inserted after "@" in the composer (the user id without the leading @). */
   displayName: string
 }
 

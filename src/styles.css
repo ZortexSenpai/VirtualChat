@@ -1085,6 +1085,35 @@ body {
   color: var(--text-muted);
 }
 
+/* Discord-style mention pill: rendered display name over a blurple chip.
+   Clicking opens the profile popup. */
+.mention-pill {
+  padding: 0 3px 1px;
+  border-radius: 4px;
+  background: rgba(88, 101, 242, 0.28);
+  color: #c3c9ff;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.mention-pill:hover {
+  background: rgba(88, 101, 242, 0.6);
+  color: #fff;
+}
+
+/* Row highlight when a message mentions you (push-rule highlight tweak). */
+.message-group.message-mentioned,
+.message-continuation.message-mentioned {
+  background: rgba(250, 166, 26, 0.08);
+  box-shadow: inset 3px 0 0 rgba(250, 166, 26, 0.85);
+}
+
+.message-group.message-mentioned:hover,
+.message-continuation.message-mentioned:hover {
+  background: rgba(250, 166, 26, 0.14);
+}
+
 /* ============================================================
    Layout: Compact
    ============================================================ */

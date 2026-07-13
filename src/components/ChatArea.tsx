@@ -14,6 +14,10 @@ import ForwardModal from './ForwardModal'
 
 // Local context so emote-aware components don't need prop-drilling.
 const EmoteMapContext = React.createContext<Record<string, RoomEmote>>({})
+
+// Lets mention pills (rendered deep inside ReactMarkdown, including in the
+// thread panel) open the ChatArea-level profile popup without prop drilling.
+const MentionClickContext = React.createContext<((userId: string, anchorRect: DOMRect) => void) | null>(null)
 function useEmoteMap() { return React.useContext(EmoteMapContext) }
 
 // ---- Spoiler support ----
@@ -674,6 +678,48 @@ function substituteEmotes(
 }
 
 /** Build ReactMarkdown `components` overrides that substitute emotes in text-bearing elements. */
+// Bare Matrix user id in message text. The lookbehind keeps ids inside URLs
+// (e.g. an autolinked matrix.to permalink) from matching a second time.
+const MXID_IN_TEXT_RE = /(?<![\w/#@.-])@[A-Za-z0-9._=+-]+:[A-Za-z0-9.-]+(?::\d+)?/g
+
+/** Extract the user id from a matrix.to user link, or null for any other href. */
+function matrixToUserId(href: unknown): string | null {
+  if (typeof href !== 'string' || !href.startsWith('https://matrix.to/#/')) return null
+  let target = href.slice('https://matrix.to/#/'.length)
+  try { target = decodeURIComponent(target) } catch { /* keep raw */ }
+  return target.startsWith('@') && !target.includes('/') ? target : null
+}
+
+/**
+ * Discord-style mention pills: rewrite bare user ids of room members into
+ * markdown mention links whose text is the member's display name, so the
+ * renderer shows "@Hans Muster" instead of "@hans.muster:matrix.org".
+ * Code spans are left untouched; non-members stay as plain text.
+ */
+function linkifyMentions(text: string, room: any): string {
+  if (!room || !text.includes('@')) return text
+  const segments = text.split(/(```[\s\S]*?```|`[^`\n]*`)/)
+  return segments.map(seg => {
+    if (seg.startsWith('`')) return seg
+    return seg.replace(MXID_IN_TEXT_RE, mxid => {
+      const name = room.getMember(mxid)?.name
+      if (!name) return mxid
+      // Escape markdown so a quirky display name can't break the link syntax.
+      const safe = name.replace(/([\\[\]*_~`])/g, '\\$1')
+      return `[@${safe}](https://matrix.to/#/${mxid})`
+    })
+  }).join('')
+}
+
+/** Plain-text variant for previews: swap member ids for "@Display Name". */
+function mentionsToDisplayNames(text: string, room: any): string {
+  if (!room || !text.includes('@')) return text
+  return text.replace(MXID_IN_TEXT_RE, mxid => {
+    const name = room.getMember(mxid)?.name
+    return name ? `@${name}` : mxid
+  })
+}
+
 function emoteMarkdownComponents(emoteMap: Record<string, RoomEmote>, client: any, twemoji: boolean) {
   const hasEmotes = Object.keys(emoteMap).length > 0
   const sub = (children: React.ReactNode) => {
@@ -682,10 +728,27 @@ function emoteMarkdownComponents(emoteMap: Record<string, RoomEmote>, client: an
     return result
   }
   return {
-    // Open external links in a new tab with safe rel attrs.
-    a: ({ children, href, ...rest }: any) => (
-      <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>{children}</a>
-    ),
+    // Mention links render as pills; other links open in a new tab with safe rel attrs.
+    a: ({ children, href, ...rest }: any) => {
+      const onMentionClick = React.useContext(MentionClickContext)
+      const mentionUserId = matrixToUserId(href)
+      if (mentionUserId) {
+        return (
+          <span
+            className="mention-pill"
+            role={onMentionClick ? 'button' : undefined}
+            tabIndex={onMentionClick ? 0 : undefined}
+            onClick={onMentionClick ? e => {
+              e.stopPropagation()
+              onMentionClick(mentionUserId, (e.currentTarget as HTMLElement).getBoundingClientRect())
+            } : undefined}
+          >
+            {sub(children)}
+          </span>
+        )
+      }
+      return <a href={href} target="_blank" rel="noopener noreferrer" {...rest}>{children}</a>
+    },
     p: ({ children }: any) => <p>{sub(children)}</p>,
     strong: ({ children }: any) => <strong>{sub(children)}</strong>,
     em: ({ children }: any) => <em>{sub(children)}</em>,
@@ -1234,6 +1297,7 @@ function MessageContent({ event, client }: { event: MatrixEvent; client: any }) 
       previewText = 'Poll'
     } else {
       previewText = ((repliedContent.body as string | undefined) ?? '').replace(/^(>[^\n]*\n)+\n/, '').replace(/\n+/g, ' ')
+      previewText = mentionsToDisplayNames(previewText, repliedRoom)
     }
 
     return (
@@ -1314,6 +1378,11 @@ function MessageContent({ event, client }: { event: MatrixEvent; client: any }) 
   })
 
   const previewUrls = extractPreviewUrls(bodyText)
+
+  // Discord-style: show mentioned members' display names as pills instead of
+  // raw user ids. Runs after preview extraction so the generated matrix.to
+  // links never produce URL preview cards.
+  bodyText = linkifyMentions(bodyText, client?.getRoom?.(event.getRoomId() ?? '') ?? null)
 
   // Check formatted_body for Matrix-spec spoiler spans first, then fall back to ||spoiler|| in plain body
   const formattedBody: string | undefined = content.formatted_body
@@ -2658,10 +2727,39 @@ export default function ChatArea({
     return activeRoom?.getMember(userId)?.name || userId.replace(/^@/, '').split(':')[0]
   }
 
+  // Same push-rule evaluation the notification path uses: highlight = mention
+  // or keyword hit. The SDK returns no actions for our own events, so a user's
+  // own messages never highlight.
+  function eventMentionsMe(event: MatrixEvent): boolean {
+    if (!client) return false
+    try {
+      const actions = client.getPushActionsForEvent(event) as { tweaks?: { highlight?: boolean } } | null
+      return !!actions?.tweaks?.highlight
+    } catch {
+      return false
+    }
+  }
+
   function openProfile(userId: string, senderName: string, avatarMxc: string | null, e: React.MouseEvent) {
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setProfile({ userId, displayName: senderName, avatarMxc, anchorRect: rect, roomId: state.activeRoomId ?? undefined, myUserId: state.userId ?? undefined })
   }
+
+  // Profile popup for mention-pill clicks; resolves the member's details from
+  // room state since pills only carry the user id.
+  const openMentionProfile = useCallback((userId: string, anchorRect: DOMRect) => {
+    const room = state.activeRoomId ? client?.getRoom(state.activeRoomId) : null
+    const member = room?.getMember(userId)
+    setProfile({
+      userId,
+      displayName: member?.name || userId.replace(/^@/, '').split(':')[0],
+      avatarMxc: member?.getMxcAvatarUrl() ?? null,
+      anchorRect,
+      roomId: state.activeRoomId ?? undefined,
+      myUserId: state.userId ?? undefined,
+      powerLevel: member?.powerLevel,
+    })
+  }, [client, state.activeRoomId, state.userId])
 
   const userCanPin = (() => {
     if (!activeRoom) return false
@@ -2725,6 +2823,7 @@ export default function ChatArea({
 
   return (
     <EmoteMapContext.Provider value={emoteMap}>
+    <MentionClickContext.Provider value={openMentionProfile}>
     <div
       className="chat-area"
       onDragEnter={onDragEnter}
@@ -2902,7 +3001,7 @@ export default function ChatArea({
                 {showNewDivider && <div className="new-messages-divider"><span>New Messages</span></div>}
               <div>
                 {/* First message in group */}
-                <div className={`message-group${group.sender === state.userId ? ' message-mine' : ''}`} onContextMenu={e => openMsgCtxMenu(e, group.events[0])}>
+                <div className={`message-group${group.sender === state.userId ? ' message-mine' : ''}${eventMentionsMe(group.events[0]) ? ' message-mentioned' : ''}`} onContextMenu={e => openMsgCtxMenu(e, group.events[0])}>
                   <div
                     className="message-avatar"
                     onClick={e => openProfile(group.sender, group.senderName, group.avatarMxc, e)}
@@ -2955,7 +3054,7 @@ export default function ChatArea({
                 {group.events.slice(1).map(event => (
                   <div
                     key={event.getId()}
-                    className={`message-continuation${group.sender === state.userId ? ' message-mine' : ''}`}
+                    className={`message-continuation${group.sender === state.userId ? ' message-mine' : ''}${eventMentionsMe(event) ? ' message-mentioned' : ''}`}
                     style={{ position: 'relative', paddingLeft: '72px', paddingRight: '48px' }}
                     onContextMenu={e => openMsgCtxMenu(e, event)}
                   >
@@ -3085,6 +3184,7 @@ export default function ChatArea({
         <SearchModal roomId={state.activeRoomId} onClose={() => setShowSearch(false)} />
       )}
     </div>
+    </MentionClickContext.Provider>
     </EmoteMapContext.Provider>
   )
 }

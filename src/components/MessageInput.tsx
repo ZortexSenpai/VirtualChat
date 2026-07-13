@@ -638,14 +638,17 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
 
   function completeMention(item: MentionPaletteItem) {
     if (!mentionQuery) return
-    const replacement = `@${item.displayName} `
+    // Cinny-style: insert the full Matrix ID (@user:server) rather than the
+    // display name, so the mention is unambiguous across homeservers.
+    const mentionText = item.userId.replace(/^@/, '')
+    const replacement = `@${mentionText} `
     const newText = text.slice(0, mentionQuery.start) + replacement + text.slice(mentionQuery.end)
     const newCursor = mentionQuery.start + replacement.length
     setText(newText)
     setPendingMentions(prev => {
       // Avoid duplicate entries when the same user is tagged twice.
-      if (prev.some(p => p.userId === item.userId && p.displayName === item.displayName)) return prev
-      return [...prev, { userId: item.userId, displayName: item.displayName }]
+      if (prev.some(p => p.userId === item.userId)) return prev
+      return [...prev, { userId: item.userId, displayName: mentionText }]
     })
     requestAnimationFrame(() => {
       const ta = textareaRef.current
