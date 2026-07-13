@@ -57,6 +57,7 @@ const en: Record<string, string> = {
   'sidebar.decline': 'Decline',
   'sidebar.unpin': 'Unpin',
   'sidebar.roomOptions': 'Room options',
+  'sidebar.spaceSettings': 'Space settings',
   'sidebar.noRoomsFound': 'No rooms found.',
   'sidebar.loadingRooms': 'Loading rooms…',
 
@@ -64,6 +65,7 @@ const en: Record<string, string> = {
   'members.onlineCount': 'Online — {count}',
   'members.membersCount': 'Members — {count}',
   'members.loading': 'Loading members…',
+  'members.message': 'Message',
 
   // Settings tabs
   'settings.tabs.account': 'Account',
@@ -115,6 +117,7 @@ const en: Record<string, string> = {
   'composer.moreOptions': 'More options',
   'composer.sendMessage': 'Send message',
   'composer.sendGif': 'Send a GIF',
+  'composer.emoji': 'Emoji',
   'composer.editing': 'Editing message',
   'composer.replyingTo': 'Replying to',
   'composer.cancelEdit': 'Cancel edit',

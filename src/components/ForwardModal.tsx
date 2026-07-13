@@ -3,6 +3,7 @@ import { MatrixEvent, Room } from 'matrix-js-sdk'
 import { useMatrix } from '../context/MatrixContext'
 import MxcAvatar from './MxcAvatar'
 import { isVoiceChannel } from '../services/roomKind'
+import { getRoomAvatarMxc } from '../services/roomAvatar'
 
 interface ForwardTarget {
   room: Room
@@ -45,7 +46,7 @@ export default function ForwardModal({ event, onClose }: { event: MatrixEvent; o
         room,
         name: room.name || room.roomId,
         kind,
-        avatarMxc: room.getMxcAvatarUrl() ?? null,
+        avatarMxc: getRoomAvatarMxc(room),
       })
     }
     return out

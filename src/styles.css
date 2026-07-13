@@ -531,9 +531,12 @@ body {
   justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   flex-shrink: 0;
-  cursor: pointer;
   transition: background 0.1s;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-header--clickable {
+  cursor: pointer;
 }
 
 .space-banner {
@@ -588,7 +591,7 @@ body {
   border-radius: 4px;
 }
 
-.sidebar-header:hover {
+.sidebar-header--clickable:hover {
   background: var(--bg-hover);
 }
 
@@ -1082,6 +1085,35 @@ body {
   color: var(--text-muted);
 }
 
+/* Discord-style mention pill: rendered display name over a blurple chip.
+   Clicking opens the profile popup. */
+.mention-pill {
+  padding: 0 3px 1px;
+  border-radius: 4px;
+  background: rgba(88, 101, 242, 0.28);
+  color: #c3c9ff;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.mention-pill:hover {
+  background: rgba(88, 101, 242, 0.6);
+  color: #fff;
+}
+
+/* Row highlight when a message mentions you (push-rule highlight tweak). */
+.message-group.message-mentioned,
+.message-continuation.message-mentioned {
+  background: rgba(250, 166, 26, 0.08);
+  box-shadow: inset 3px 0 0 rgba(250, 166, 26, 0.85);
+}
+
+.message-group.message-mentioned:hover,
+.message-continuation.message-mentioned:hover {
+  background: rgba(250, 166, 26, 0.14);
+}
+
 /* ============================================================
    Layout: Compact
    ============================================================ */
@@ -1569,6 +1601,10 @@ body {
   color: var(--header-primary);
   margin-bottom: 2px;
   letter-spacing: -0.01em;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
 }
 
 .profile-popup-id {
@@ -1922,6 +1958,13 @@ body {
   opacity: 0.7;
 }
 
+/* Anchor for the composer emoji picker popover. */
+.input-emoji {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .input-btn {
   width: 36px;
   height: 36px;
@@ -2084,6 +2127,7 @@ body {
 }
 
 .member-item {
+  position: relative;
   display: flex;
   align-items: center;
   gap: 10px;
@@ -2096,6 +2140,34 @@ body {
 
 .member-item:hover {
   background: var(--bg-hover);
+}
+
+/* Profile banner behind the member row. The gradient fades the image into the
+   theme background toward the left, where the name sits. */
+.member-item-banner {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background-size: cover;
+  background-position: center;
+  pointer-events: none;
+}
+
+.member-item-banner::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(to right, var(--bg-2) 30%, transparent 100%);
+}
+
+.member-item--banner:hover .member-item-banner {
+  filter: brightness(1.15);
+}
+
+/* Keep the row content above the absolutely-positioned banner layer. */
+.member-item > .member-info {
+  position: relative;
 }
 
 .member-avatar-wrap {
@@ -3120,6 +3192,33 @@ body {
 /* ---- Profile popup kick action ---- */
 .profile-popup-actions {
   padding: 0 12px 12px;
+}
+
+.profile-popup-dm-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 8px 10px;
+  background: rgba(99, 102, 241, 0.12);
+  color: #a5b4fc;
+  border: 1px solid rgba(99, 102, 241, 0.25);
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+
+.profile-popup-dm-btn:hover {
+  background: rgba(99, 102, 241, 0.2);
+  border-color: rgba(99, 102, 241, 0.4);
+}
+
+.profile-popup-dm-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .profile-popup-kick-btn {
@@ -7863,6 +7962,27 @@ body {
   line-height: 1.4;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* Markdown output manages its own line breaks — pre-wrap would double them
+   and mangle code blocks. */
+.pinned-item-body.markdown-body {
+  white-space: normal;
+}
+
+.pinned-item-body.markdown-body pre {
+  overflow-x: auto;
+}
+
+.pinned-item-attachment {
+  color: var(--text-muted);
+  font-style: italic;
+}
+
+.pinned-item-media .message-body img {
+  max-width: 100%;
+  max-height: 160px;
+  border-radius: 8px;
 }
 
 /* ---- Search Modal ---- */

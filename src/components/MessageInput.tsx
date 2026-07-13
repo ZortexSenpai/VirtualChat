@@ -3,6 +3,7 @@ import { MatrixEvent } from 'matrix-js-sdk'
 import { useMatrix } from '../context/MatrixContext'
 import type { StickerPack, StickerItem, PollAnswer, MentionRef } from '../context/MatrixContext'
 import GifPicker from './GifPicker'
+import { ReactionPicker } from './ChatArea'
 import { useMxcBlobUrl } from './MxcAvatar'
 import LocationShareModal from './LocationShareModal'
 import { matchCommands, parseCommandLine, findCommand } from '../services/commands'
@@ -360,6 +361,7 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [showGif, setShowGif] = useState(false)
+  const [showEmoji, setShowEmoji] = useState(false)
   const [showStickers, setShowStickers] = useState(false)
   const [showPoll, setShowPoll] = useState(false)
   const [showLocation, setShowLocation] = useState(false)
@@ -636,14 +638,17 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
 
   function completeMention(item: MentionPaletteItem) {
     if (!mentionQuery) return
-    const replacement = `@${item.displayName} `
+    // Cinny-style: insert the full Matrix ID (@user:server) rather than the
+    // display name, so the mention is unambiguous across homeservers.
+    const mentionText = item.userId.replace(/^@/, '')
+    const replacement = `@${mentionText} `
     const newText = text.slice(0, mentionQuery.start) + replacement + text.slice(mentionQuery.end)
     const newCursor = mentionQuery.start + replacement.length
     setText(newText)
     setPendingMentions(prev => {
       // Avoid duplicate entries when the same user is tagged twice.
-      if (prev.some(p => p.userId === item.userId && p.displayName === item.displayName)) return prev
-      return [...prev, { userId: item.userId, displayName: item.displayName }]
+      if (prev.some(p => p.userId === item.userId)) return prev
+      return [...prev, { userId: item.userId, displayName: mentionText }]
     })
     requestAnimationFrame(() => {
       const ta = textareaRef.current
@@ -899,6 +904,21 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
       case 'i': e.preventDefault(); wrapSelection('*', '*'); break
       case 'u': e.preventDefault(); wrapSelection('<u>', '</u>'); break
     }
+  }
+
+  function insertEmoji(str: string) {
+    const ta = textareaRef.current
+    const start = ta?.selectionStart ?? text.length
+    const end = ta?.selectionEnd ?? text.length
+    setText(text.slice(0, start) + str + text.slice(end))
+    const pos = start + str.length
+    requestAnimationFrame(() => {
+      const el = textareaRef.current
+      if (!el) return
+      el.focus({ preventScroll: true })
+      el.setSelectionRange(pos, pos)
+      setCursorPos(pos)
+    })
   }
 
   async function handleVoiceSend(blob: Blob, durationMs: number, waveform: number[]) {
@@ -1274,6 +1294,30 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
           }}
           disabled={!state.activeRoomId || sending}
         />
+
+        {/* Emoji picker */}
+        <div className="input-emoji">
+          <button
+            className={`input-btn${showEmoji ? ' active' : ''}`}
+            title={t('composer.emoji')}
+            // The picker closes itself on any outside mousedown; swallow ours so
+            // a click on the toggle doesn't close-then-reopen it.
+            onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
+            onClick={() => setShowEmoji(v => !v)}
+            disabled={!state.activeRoomId || recording}
+            type="button"
+          >
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <path d="M8 14s1.5 2 4 2 4-2 4-2" />
+              <line x1="9" y1="9" x2="9.01" y2="9" />
+              <line x1="15" y1="9" x2="15.01" y2="9" />
+            </svg>
+          </button>
+          {showEmoji && (
+            <ReactionPicker onPick={insertEmoji} onClose={() => setShowEmoji(false)} />
+          )}
+        </div>
 
         {/* Send button */}
         <button
