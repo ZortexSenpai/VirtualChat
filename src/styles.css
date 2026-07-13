@@ -1102,6 +1102,17 @@ body {
   color: #fff;
 }
 
+/* Brief flash after "jump to message" so the target row is easy to spot. */
+.message-group.message-flash,
+.message-continuation.message-flash {
+  animation: message-flash 2s ease-out;
+}
+
+@keyframes message-flash {
+  0%, 35% { background: rgba(88, 101, 242, 0.22); }
+  100% { background: transparent; }
+}
+
 /* Row highlight when a message mentions you (push-rule highlight tweak). */
 .message-group.message-mentioned,
 .message-continuation.message-mentioned {
@@ -7936,6 +7947,12 @@ body {
   border: 1px solid var(--glass-border);
   border-radius: 10px;
   padding: 10px 14px;
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+
+.pinned-item:hover {
+  background: var(--bg-hover);
 }
 
 .pinned-item-header {
@@ -7943,6 +7960,63 @@ body {
   align-items: baseline;
   gap: 8px;
   margin-bottom: 4px;
+}
+
+/* Jump/unpin controls, revealed on item hover. */
+.pinned-item-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  opacity: 0;
+  transition: opacity 0.1s;
+}
+
+.pinned-item:hover .pinned-item-actions {
+  opacity: 1;
+}
+
+.pinned-item-jump {
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--interactive-normal);
+  font-family: inherit;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.pinned-item-jump:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--interactive-hover);
+}
+
+.pinned-item-unpin {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 6px;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.pinned-item-unpin:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #f87171;
+}
+
+.pinned-item-unpin:disabled {
+  opacity: 0.5;
+  cursor: default;
 }
 
 .pinned-item-sender {

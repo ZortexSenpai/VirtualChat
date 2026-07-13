@@ -150,10 +150,28 @@ function PinnedItemBody({ item, client }: { item: PinnedItem; client: any }) {
   )
 }
 
-function PinnedMessagesModal({ roomId, onClose }: { roomId: string; onClose: () => void }) {
-  const { client } = useMatrix()
+function PinnedMessagesModal({ roomId, canUnpin, onJump, onClose }: {
+  roomId: string
+  canUnpin: boolean
+  onJump: (eventId: string) => void
+  onClose: () => void
+}) {
+  const { client, unpinMessage } = useMatrix()
   const [items, setItems] = useState<Array<PinnedItem | null>>([])
   const [loading, setLoading] = useState(true)
+  const [unpinningId, setUnpinningId] = useState<string | null>(null)
+
+  async function handleUnpin(eventId: string) {
+    setUnpinningId(eventId)
+    try {
+      await unpinMessage(roomId, eventId)
+      setItems(prev => prev.filter(it => it?.id !== eventId))
+    } catch (err) {
+      console.error('Failed to unpin:', err)
+    } finally {
+      setUnpinningId(null)
+    }
+  }
 
   useEffect(() => {
     if (!client) return
@@ -204,12 +222,31 @@ function PinnedMessagesModal({ roomId, onClose }: { roomId: string; onClose: () 
         ) : (
           <div className="pinned-list">
             {valid.map(e => (
-              <div key={e.id} className="pinned-item">
+              <div key={e.id} className="pinned-item" onClick={() => onJump(e.id)} title="Jump to message">
                 <div className="pinned-item-header">
                   <span className="pinned-item-sender">{e.sender}</span>
                   <span className="pinned-item-time">
                     {e.ts ? new Date(e.ts).toLocaleString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}
                   </span>
+                  <div className="pinned-item-actions">
+                    <button
+                      className="pinned-item-jump"
+                      onClick={ev => { ev.stopPropagation(); onJump(e.id) }}
+                    >
+                      Jump
+                    </button>
+                    {canUnpin && (
+                      <button
+                        className="pinned-item-unpin"
+                        title="Unpin"
+                        aria-label="Unpin message"
+                        disabled={unpinningId === e.id}
+                        onClick={ev => { ev.stopPropagation(); handleUnpin(e.id) }}
+                      >
+                        ✕
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <PinnedItemBody item={e} client={client} />
               </div>
@@ -2600,6 +2637,79 @@ export default function ChatArea({
     }
   }, [isLoadingOlder])
 
+  // Discord-style "jump to message": scroll the target row into view and flash
+  // it. If the message isn't rendered yet, paginate backwards until it appears
+  // (bounded, and stops early once the room has no more history).
+  const [flashEventId, setFlashEventId] = useState<string | null>(null)
+  const flashTimerRef = useRef<number | null>(null)
+
+  async function jumpToMessage(eventId: string) {
+    const findEl = () =>
+      messageListRef.current?.querySelector(`[data-event-id="${CSS.escape(eventId)}"]`) as HTMLElement | null
+
+    // Release the pinned-to-bottom state before moving anywhere. The pin
+    // observers (MutationObserver/ResizeObserver + new-message effect) snap the
+    // list back to the bottom on any DOM change while atBottomRef is set — the
+    // flash class alone would instantly undo the jump. Mutation callbacks run
+    // before the scroll event that would clear the flag, so clear it here.
+    atBottomRef.current = false
+    setAtBottom(false)
+
+    let paginated = false
+    if (!findEl() && !isLoadingOlderRef.current) {
+      const room = client?.getRoom(state.activeRoomId ?? '')
+      isLoadingOlderRef.current = true
+      setIsLoadingOlder(true)
+      paginated = true
+      try {
+        // Break only after two consecutive rounds without timeline growth: a
+        // single flat round can just mean a concurrent pagination was already
+        // in flight (loadMoreMessages no-ops while one is running).
+        let stale = 0
+        for (let i = 0; i < 30 && !findEl(); i++) {
+          const before = room?.getLiveTimeline().getEvents().length ?? 0
+          await loadMoreRef.current()
+          // Let React commit the newly prepended rows before re-querying the DOM.
+          await new Promise(r => setTimeout(r, 50))
+          const after = room?.getLiveTimeline().getEvents().length ?? 0
+          if (after === before) {
+            if (++stale >= 2) break
+          } else {
+            stale = 0
+          }
+        }
+      } finally {
+        isLoadingOlderRef.current = false
+        setIsLoadingOlder(false)
+      }
+    }
+
+    const el = findEl()
+    if (!el) return
+    el.scrollIntoView({ block: 'center' })
+    // Re-derive the bottom pin from the real position: if the target sits in
+    // the last screenful the list is still at the bottom and should keep
+    // auto-following new messages.
+    const listNode = messageListRef.current
+    if (listNode) {
+      const nowAtBottom = listNode.scrollHeight - listNode.scrollTop - listNode.clientHeight < 80
+      atBottomRef.current = nowAtBottom
+      setAtBottom(nowAtBottom)
+    }
+    setFlashEventId(eventId)
+    if (flashTimerRef.current) window.clearTimeout(flashTimerRef.current)
+    flashTimerRef.current = window.setTimeout(() => setFlashEventId(null), 2000)
+
+    // Media in freshly paginated rows loads after the first scroll and shifts
+    // the layout above the target — re-center once, after things settle.
+    if (paginated) {
+      window.setTimeout(() => {
+        if (atBottomRef.current) return // user scrolled back down meanwhile
+        findEl()?.scrollIntoView({ block: 'center' })
+      }, 350)
+    }
+  }
+
   // Send read receipt for the last message when at bottom
   const sendReceiptForLastMessage = useCallback(() => {
     if (!state.readMarkerEventId && state.messages.length === 0) return
@@ -3001,7 +3111,11 @@ export default function ChatArea({
                 {showNewDivider && <div className="new-messages-divider"><span>New Messages</span></div>}
               <div>
                 {/* First message in group */}
-                <div className={`message-group${group.sender === state.userId ? ' message-mine' : ''}${eventMentionsMe(group.events[0]) ? ' message-mentioned' : ''}`} onContextMenu={e => openMsgCtxMenu(e, group.events[0])}>
+                <div
+                  className={`message-group${group.sender === state.userId ? ' message-mine' : ''}${eventMentionsMe(group.events[0]) ? ' message-mentioned' : ''}${flashEventId === group.events[0].getId() ? ' message-flash' : ''}`}
+                  data-event-id={group.events[0].getId() ?? undefined}
+                  onContextMenu={e => openMsgCtxMenu(e, group.events[0])}
+                >
                   <div
                     className="message-avatar"
                     onClick={e => openProfile(group.sender, group.senderName, group.avatarMxc, e)}
@@ -3054,7 +3168,8 @@ export default function ChatArea({
                 {group.events.slice(1).map(event => (
                   <div
                     key={event.getId()}
-                    className={`message-continuation${group.sender === state.userId ? ' message-mine' : ''}${eventMentionsMe(event) ? ' message-mentioned' : ''}`}
+                    className={`message-continuation${group.sender === state.userId ? ' message-mine' : ''}${eventMentionsMe(event) ? ' message-mentioned' : ''}${flashEventId === event.getId() ? ' message-flash' : ''}`}
+                    data-event-id={event.getId() ?? undefined}
                     style={{ position: 'relative', paddingLeft: '72px', paddingRight: '48px' }}
                     onContextMenu={e => openMsgCtxMenu(e, event)}
                   >
@@ -3176,7 +3291,12 @@ export default function ChatArea({
 
       {/* Pinned messages modal */}
       {showPinned && state.activeRoomId && (
-        <PinnedMessagesModal roomId={state.activeRoomId} onClose={() => setShowPinned(false)} />
+        <PinnedMessagesModal
+          roomId={state.activeRoomId}
+          canUnpin={userCanPin}
+          onJump={eventId => { setShowPinned(false); jumpToMessage(eventId) }}
+          onClose={() => setShowPinned(false)}
+        />
       )}
 
       {/* Search modal */}
