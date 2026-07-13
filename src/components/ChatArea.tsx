@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { MatrixEvent, EventType, MsgType } from 'matrix-js-sdk'
 import ReactMarkdown from 'react-markdown'
+import rehypeHighlight from 'rehype-highlight'
 import { useMatrix } from '../context/MatrixContext'
 import MessageInput from './MessageInput'
 import MxcAvatar from './MxcAvatar'
@@ -14,6 +15,11 @@ import ForwardModal from './ForwardModal'
 
 // Local context so emote-aware components don't need prop-drilling.
 const EmoteMapContext = React.createContext<Record<string, RoomEmote>>({})
+
+// Syntax highlighting for fenced code blocks (```csharp …). Only blocks with a
+// language tag are colored — no auto-detection — matching GitHub's behavior.
+// Unknown languages fall back to plain text.
+const MD_REHYPE_PLUGINS = [rehypeHighlight]
 
 // Lets mention pills (rendered deep inside ReactMarkdown, including in the
 // thread panel) open the ChatArea-level profile popup without prop drilling.
@@ -49,15 +55,15 @@ function renderBodyWithSpoilers(text: string): React.ReactNode {
   const re = new RegExp(SPOILER_RE.source, SPOILER_RE.flags)
   while ((match = re.exec(text)) !== null) {
     if (match.index > lastIndex) {
-      parts.push(<ReactMarkdown key={`t${lastIndex}`}>{text.slice(lastIndex, match.index)}</ReactMarkdown>)
+      parts.push(<ReactMarkdown key={`t${lastIndex}`} rehypePlugins={MD_REHYPE_PLUGINS}>{text.slice(lastIndex, match.index)}</ReactMarkdown>)
     }
     parts.push(<Spoiler key={`s${match.index}`}>{match[1]}</Spoiler>)
     lastIndex = re.lastIndex
   }
   if (lastIndex < text.length) {
-    parts.push(<ReactMarkdown key={`t${lastIndex}`}>{text.slice(lastIndex)}</ReactMarkdown>)
+    parts.push(<ReactMarkdown key={`t${lastIndex}`} rehypePlugins={MD_REHYPE_PLUGINS}>{text.slice(lastIndex)}</ReactMarkdown>)
   }
-  return parts.length > 0 ? parts : <ReactMarkdown>{text}</ReactMarkdown>
+  return parts.length > 0 ? parts : <ReactMarkdown rehypePlugins={MD_REHYPE_PLUGINS}>{text}</ReactMarkdown>
 }
 
 /**
@@ -145,7 +151,7 @@ function PinnedItemBody({ item, client }: { item: PinnedItem; client: any }) {
   body = body.replace(/(?<!\n)\n(?!\n)/g, '  \n')
   return (
     <div className="pinned-item-body markdown-body">
-      <ReactMarkdown>{body}</ReactMarkdown>
+      <ReactMarkdown rehypePlugins={MD_REHYPE_PLUGINS}>{body}</ReactMarkdown>
     </div>
   )
 }
@@ -1435,7 +1441,7 @@ function MessageContent({ event, client }: { event: MatrixEvent; client: any }) 
     <>
       {replyQuote}
       <div className="message-body markdown-body">
-        {formattedSpoilers ?? (hasSpoilerSyntax ? renderBodyWithSpoilers(bodyText) : <ReactMarkdown components={mdComponents}>{bodyText}</ReactMarkdown>)}
+        {formattedSpoilers ?? (hasSpoilerSyntax ? renderBodyWithSpoilers(bodyText) : <ReactMarkdown components={mdComponents} rehypePlugins={MD_REHYPE_PLUGINS}>{bodyText}</ReactMarkdown>)}
         {isEdited && <span className="message-edited-label">(edited)</span>}
       </div>
       {previewUrls.map(u => (
