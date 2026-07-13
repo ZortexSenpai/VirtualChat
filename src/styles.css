@@ -7579,6 +7579,488 @@ body {
 
 
 /* ============================================================
+   GitHub Light theme
+   ============================================================ */
+:root[data-theme="github-light"] {
+  --bg-1: #ffffff;
+  --bg-2: #f6f8fa;
+  --bg-3: #fafbfc;
+  --bg-4: #ffffff;
+  --bg-input: rgba(0,0,0,0.05);
+  --bg-hover: rgba(0,0,0,0.04);
+  --bg-active: rgba(0,0,0,0.08);
+  --bg-modifier-selected: rgba(0,0,0,0.10);
+
+  --text-normal: #1f2328;
+  --text-muted: #656d76;
+  --text-link: #0969da;
+  --header-primary: #1f2328;
+  --header-secondary: #57606a;
+  --interactive-normal: #57606a;
+  --interactive-hover: #24292f;
+  --interactive-active: #1f2328;
+  --interactive-muted: #d0d7de;
+  --channels-default: #57606a;
+
+  --brand: #0969da;
+  --brand-hover: #0757ba;
+  --brand-active: #0550ae;
+  --brand-click: #0550ae;
+
+  --status-online: #1a7f37;
+  --status-idle: #bf8700;
+  --status-dnd: #cf222e;
+  --status-offline: #6e7781;
+  --status-streaming: #8250df;
+
+  --danger: #cf222e;
+  --danger-hover: #a40e26;
+
+  --border-color: rgba(0,0,0,0.10);
+  --scrollbar-thumb: rgba(0,0,0,0.18);
+  --shadow: 0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+  --elevation-high: 0 24px 64px rgba(0,0,0,0.11), 0 8px 24px rgba(0,0,0,0.06);
+  --glow: 0 0 0 3px rgba(9,105,218,0.22);
+
+  --glass-sidebar:    rgba(246,248,250,0.82);
+  --glass-panel:      rgba(255,255,255,0.76);
+  --glass-surface:    rgba(0,0,0,0.035);
+  --glass-float:      rgba(255,255,255,0.92);
+  --glass-modal:      rgba(246,248,250,0.94);
+  --glass-card:       rgba(0,0,0,0.03);
+  --glass-input:      rgba(0,0,0,0.05);
+  --glass-border:     rgba(0,0,0,0.10);
+  --glass-border-lg:  rgba(0,0,0,0.16);
+  --glass-highlight:        inset 0 1px 0 rgba(255,255,255,0.80);
+  --glass-highlight-strong: inset 0 1px 0 rgba(255,255,255,0.90);
+  --glass-shadow:     0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.80);
+  --glass-shadow-lg:  0 24px 64px rgba(0,0,0,0.11), 0 8px 24px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.80);
+}
+
+
+/* ============================================================
+   One Light theme — Atom's light companion
+   ============================================================ */
+:root[data-theme="one-light"] {
+  --bg-1: #fafafa;
+  --bg-2: #eaeaeb;
+  --bg-3: #f0f0f1;
+  --bg-4: #ffffff;
+  --bg-input: rgba(0,0,0,0.05);
+  --bg-hover: rgba(0,0,0,0.04);
+  --bg-active: rgba(0,0,0,0.08);
+  --bg-modifier-selected: rgba(0,0,0,0.10);
+
+  --text-normal: #383a42;
+  --text-muted: #a0a1a7;
+  --text-link: #4078f2;
+  --header-primary: #202227;
+  --header-secondary: #696c77;
+  --interactive-normal: #696c77;
+  --interactive-hover: #383a42;
+  --interactive-active: #202227;
+  --interactive-muted: #d4d4d6;
+  --channels-default: #696c77;
+
+  --brand: #4078f2;
+  --brand-hover: #2a63d9;
+  --brand-active: #1f53c0;
+  --brand-click: #1f53c0;
+
+  --status-online: #50a14f;
+  --status-idle: #c18401;
+  --status-dnd: #e45649;
+  --status-offline: #a0a1a7;
+  --status-streaming: #a626a4;
+
+  --danger: #e45649;
+  --danger-hover: #c73e32;
+
+  --border-color: rgba(0,0,0,0.10);
+  --scrollbar-thumb: rgba(0,0,0,0.18);
+  --shadow: 0 2px 12px rgba(0,0,0,0.09), 0 1px 3px rgba(0,0,0,0.06);
+  --elevation-high: 0 24px 64px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.07);
+  --glow: 0 0 0 3px rgba(64,120,242,0.22);
+
+  --glass-sidebar:    rgba(234,234,235,0.82);
+  --glass-panel:      rgba(250,250,250,0.76);
+  --glass-surface:    rgba(0,0,0,0.04);
+  --glass-float:      rgba(250,250,250,0.90);
+  --glass-modal:      rgba(234,234,235,0.94);
+  --glass-card:       rgba(0,0,0,0.035);
+  --glass-input:      rgba(0,0,0,0.05);
+  --glass-border:     rgba(0,0,0,0.10);
+  --glass-border-lg:  rgba(0,0,0,0.16);
+  --glass-highlight:        inset 0 1px 0 rgba(255,255,255,0.80);
+  --glass-highlight-strong: inset 0 1px 0 rgba(255,255,255,0.90);
+  --glass-shadow:     0 8px 32px rgba(0,0,0,0.09), 0 2px 8px rgba(0,0,0,0.06), inset 0 1px 0 rgba(255,255,255,0.80);
+  --glass-shadow-lg:  0 24px 64px rgba(0,0,0,0.12), 0 8px 24px rgba(0,0,0,0.08), inset 0 1px 0 rgba(255,255,255,0.80);
+}
+
+
+/* ============================================================
+   Gruvbox Light theme — warm cream & retro groove
+   ============================================================ */
+:root[data-theme="gruvbox-light"] {
+  --bg-1: #fbf1c7;
+  --bg-2: #ebdbb2;
+  --bg-3: #f2e5bc;
+  --bg-4: #f9f5d7;
+  --bg-input: rgba(0,0,0,0.05);
+  --bg-hover: rgba(0,0,0,0.04);
+  --bg-active: rgba(0,0,0,0.08);
+  --bg-modifier-selected: rgba(0,0,0,0.10);
+
+  --text-normal: #3c3836;
+  --text-muted: #928374;
+  --text-link: #076678;
+  --header-primary: #282828;
+  --header-secondary: #504945;
+  --interactive-normal: #504945;
+  --interactive-hover: #3c3836;
+  --interactive-active: #282828;
+  --interactive-muted: #d5c4a1;
+  --channels-default: #665c54;
+
+  --brand: #b57614;
+  --brand-hover: #a06a10;
+  --brand-active: #8a5c0d;
+  --brand-click: #8a5c0d;
+
+  --status-online: #79740e;
+  --status-idle: #b57614;
+  --status-dnd: #9d0006;
+  --status-offline: #928374;
+  --status-streaming: #8f3f71;
+
+  --danger: #9d0006;
+  --danger-hover: #7e0005;
+
+  --border-color: rgba(60,56,54,0.14);
+  --scrollbar-thumb: rgba(60,56,54,0.22);
+  --shadow: 0 2px 12px rgba(60,56,54,0.10), 0 1px 3px rgba(60,56,54,0.06);
+  --elevation-high: 0 24px 64px rgba(60,56,54,0.12), 0 8px 24px rgba(60,56,54,0.07);
+  --glow: 0 0 0 3px rgba(181,118,20,0.25);
+
+  --glass-sidebar:    rgba(235,219,178,0.82);
+  --glass-panel:      rgba(251,241,199,0.76);
+  --glass-surface:    rgba(60,56,54,0.05);
+  --glass-float:      rgba(251,241,199,0.92);
+  --glass-modal:      rgba(242,229,188,0.94);
+  --glass-card:       rgba(60,56,54,0.04);
+  --glass-input:      rgba(60,56,54,0.06);
+  --glass-border:     rgba(60,56,54,0.13);
+  --glass-border-lg:  rgba(60,56,54,0.20);
+  --glass-highlight:        inset 0 1px 0 rgba(255,255,255,0.60);
+  --glass-highlight-strong: inset 0 1px 0 rgba(255,255,255,0.75);
+  --glass-shadow:     0 8px 32px rgba(60,56,54,0.10), 0 2px 8px rgba(60,56,54,0.06), inset 0 1px 0 rgba(255,255,255,0.60);
+  --glass-shadow-lg:  0 24px 64px rgba(60,56,54,0.12), 0 8px 24px rgba(60,56,54,0.08), inset 0 1px 0 rgba(255,255,255,0.60);
+}
+
+
+/* ============================================================
+   Everforest Light theme — soft parchment green
+   ============================================================ */
+:root[data-theme="everforest-light"] {
+  --bg-1: #f3ead3;
+  --bg-2: #eae4ca;
+  --bg-3: #efe9d5;
+  --bg-4: #f8f0dc;
+  --bg-input: rgba(0,0,0,0.05);
+  --bg-hover: rgba(0,0,0,0.04);
+  --bg-active: rgba(0,0,0,0.08);
+  --bg-modifier-selected: rgba(0,0,0,0.10);
+
+  --text-normal: #5c6a72;
+  --text-muted: #939f91;
+  --text-link: #3a94c5;
+  --header-primary: #4f585e;
+  --header-secondary: #708089;
+  --interactive-normal: #708089;
+  --interactive-hover: #5c6a72;
+  --interactive-active: #4f585e;
+  --interactive-muted: #ddd8be;
+  --channels-default: #829181;
+
+  --brand: #8da101;
+  --brand-hover: #798b01;
+  --brand-active: #667500;
+  --brand-click: #667500;
+
+  --status-online: #8da101;
+  --status-idle: #dfa000;
+  --status-dnd: #f85552;
+  --status-offline: #939f91;
+  --status-streaming: #df69ba;
+
+  --danger: #f85552;
+  --danger-hover: #d84445;
+
+  --border-color: rgba(92,106,114,0.14);
+  --scrollbar-thumb: rgba(92,106,114,0.22);
+  --shadow: 0 2px 12px rgba(92,106,114,0.10), 0 1px 3px rgba(92,106,114,0.06);
+  --elevation-high: 0 24px 64px rgba(92,106,114,0.12), 0 8px 24px rgba(92,106,114,0.07);
+  --glow: 0 0 0 3px rgba(141,161,1,0.25);
+
+  --glass-sidebar:    rgba(234,228,202,0.82);
+  --glass-panel:      rgba(243,234,211,0.76);
+  --glass-surface:    rgba(92,106,114,0.05);
+  --glass-float:      rgba(243,234,211,0.92);
+  --glass-modal:      rgba(234,228,202,0.94);
+  --glass-card:       rgba(92,106,114,0.04);
+  --glass-input:      rgba(92,106,114,0.06);
+  --glass-border:     rgba(92,106,114,0.13);
+  --glass-border-lg:  rgba(92,106,114,0.20);
+  --glass-highlight:        inset 0 1px 0 rgba(255,255,255,0.65);
+  --glass-highlight-strong: inset 0 1px 0 rgba(255,255,255,0.80);
+  --glass-shadow:     0 8px 32px rgba(92,106,114,0.10), 0 2px 8px rgba(92,106,114,0.06), inset 0 1px 0 rgba(255,255,255,0.65);
+  --glass-shadow-lg:  0 24px 64px rgba(92,106,114,0.12), 0 8px 24px rgba(92,106,114,0.08), inset 0 1px 0 rgba(255,255,255,0.65);
+}
+
+
+/* ============================================================
+   Tokyo Night Day theme — cool periwinkle daylight
+   ============================================================ */
+:root[data-theme="tokyo-night-day"] {
+  --bg-1: #e1e2e7;
+  --bg-2: #d6d8df;
+  --bg-3: #dcdee3;
+  --bg-4: #e9eaef;
+  --bg-input: rgba(0,0,0,0.05);
+  --bg-hover: rgba(0,0,0,0.04);
+  --bg-active: rgba(0,0,0,0.08);
+  --bg-modifier-selected: rgba(0,0,0,0.10);
+
+  --text-normal: #343b58;
+  --text-muted: #7a82a5;
+  --text-link: #2e7de9;
+  --header-primary: #24294a;
+  --header-secondary: #565f89;
+  --interactive-normal: #565f89;
+  --interactive-hover: #343b58;
+  --interactive-active: #24294a;
+  --interactive-muted: #c4c8da;
+  --channels-default: #565f89;
+
+  --brand: #2e7de9;
+  --brand-hover: #1a6ad4;
+  --brand-active: #1459b8;
+  --brand-click: #1459b8;
+
+  --status-online: #587539;
+  --status-idle: #8c6c3e;
+  --status-dnd: #f52a65;
+  --status-offline: #848cb5;
+  --status-streaming: #9854f1;
+
+  --danger: #f52a65;
+  --danger-hover: #d61e55;
+
+  --border-color: rgba(52,59,88,0.13);
+  --scrollbar-thumb: rgba(52,59,88,0.20);
+  --shadow: 0 2px 12px rgba(52,59,88,0.10), 0 1px 3px rgba(52,59,88,0.06);
+  --elevation-high: 0 24px 64px rgba(52,59,88,0.12), 0 8px 24px rgba(52,59,88,0.07);
+  --glow: 0 0 0 3px rgba(46,125,233,0.22);
+
+  --glass-sidebar:    rgba(214,216,223,0.82);
+  --glass-panel:      rgba(225,226,231,0.76);
+  --glass-surface:    rgba(52,59,88,0.05);
+  --glass-float:      rgba(225,226,231,0.92);
+  --glass-modal:      rgba(214,216,223,0.94);
+  --glass-card:       rgba(52,59,88,0.04);
+  --glass-input:      rgba(52,59,88,0.06);
+  --glass-border:     rgba(52,59,88,0.12);
+  --glass-border-lg:  rgba(52,59,88,0.18);
+  --glass-highlight:        inset 0 1px 0 rgba(255,255,255,0.70);
+  --glass-highlight-strong: inset 0 1px 0 rgba(255,255,255,0.85);
+  --glass-shadow:     0 8px 32px rgba(52,59,88,0.10), 0 2px 8px rgba(52,59,88,0.06), inset 0 1px 0 rgba(255,255,255,0.70);
+  --glass-shadow-lg:  0 24px 64px rgba(52,59,88,0.12), 0 8px 24px rgba(52,59,88,0.08), inset 0 1px 0 rgba(255,255,255,0.70);
+}
+
+
+/* ============================================================
+   Ayu Light theme — crisp white with amber accents
+   ============================================================ */
+:root[data-theme="ayu-light"] {
+  --bg-1: #fcfcfc;
+  --bg-2: #f3f4f5;
+  --bg-3: #f8f9fa;
+  --bg-4: #ffffff;
+  --bg-input: rgba(0,0,0,0.05);
+  --bg-hover: rgba(0,0,0,0.04);
+  --bg-active: rgba(0,0,0,0.08);
+  --bg-modifier-selected: rgba(0,0,0,0.10);
+
+  --text-normal: #5c6166;
+  --text-muted: #8a9199;
+  --text-link: #399ee6;
+  --header-primary: #333a41;
+  --header-secondary: #6b7278;
+  --interactive-normal: #6b7278;
+  --interactive-hover: #333a41;
+  --interactive-active: #24292f;
+  --interactive-muted: #d9dbdd;
+  --channels-default: #6b7278;
+
+  --brand: #fa8d3e;
+  --brand-hover: #e6792b;
+  --brand-active: #cc681f;
+  --brand-click: #cc681f;
+
+  --status-online: #86b300;
+  --status-idle: #f2ae49;
+  --status-dnd: #f07171;
+  --status-offline: #8a9199;
+  --status-streaming: #a37acc;
+
+  --danger: #f07171;
+  --danger-hover: #d95757;
+
+  --border-color: rgba(0,0,0,0.09);
+  --scrollbar-thumb: rgba(0,0,0,0.16);
+  --shadow: 0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+  --elevation-high: 0 24px 64px rgba(0,0,0,0.11), 0 8px 24px rgba(0,0,0,0.06);
+  --glow: 0 0 0 3px rgba(250,141,62,0.28);
+
+  --glass-sidebar:    rgba(243,244,245,0.82);
+  --glass-panel:      rgba(252,252,252,0.76);
+  --glass-surface:    rgba(0,0,0,0.035);
+  --glass-float:      rgba(252,252,252,0.92);
+  --glass-modal:      rgba(243,244,245,0.94);
+  --glass-card:       rgba(0,0,0,0.03);
+  --glass-input:      rgba(0,0,0,0.05);
+  --glass-border:     rgba(0,0,0,0.09);
+  --glass-border-lg:  rgba(0,0,0,0.15);
+  --glass-highlight:        inset 0 1px 0 rgba(255,255,255,0.85);
+  --glass-highlight-strong: inset 0 1px 0 rgba(255,255,255,0.95);
+  --glass-shadow:     0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.85);
+  --glass-shadow-lg:  0 24px 64px rgba(0,0,0,0.11), 0 8px 24px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.85);
+}
+
+
+/* ============================================================
+   Virtual theme — Virtual Global Trading brand (vgt.energy)
+   VGT orange #fd6b1a with magenta→purple gradient accents
+   ============================================================ */
+:root[data-theme="virtual"] {
+  --bg-1: #1a1b21;
+  --bg-2: #212229;
+  --bg-3: #16171c;
+  --bg-4: #121316;
+  --bg-input: rgba(255,255,255,0.06);
+  --bg-hover: rgba(255,255,255,0.05);
+  --bg-active: rgba(255,255,255,0.10);
+  --bg-modifier-selected: rgba(255,255,255,0.14);
+
+  --text-normal: #e4e4e7;
+  --text-muted: #71717a;
+  --text-link: #ff8a3d;
+  --header-primary: #ffffff;
+  --header-secondary: #a1a1aa;
+  --interactive-normal: #a1a1aa;
+  --interactive-hover: #e4e4e7;
+  --interactive-active: #ffffff;
+  --interactive-muted: #2a2b33;
+  --channels-default: #8b8b94;
+
+  --brand: #fd6b1a;
+  --brand-hover: #e55a0f;
+  --brand-active: #cc4f0d;
+  --brand-click: #cc4f0d;
+
+  --status-online: #53ca81;
+  --status-idle: #ff9800;
+  --status-dnd: #ff303b;
+  --status-offline: #71717a;
+  --status-streaming: #ac4bff;
+
+  --danger: #ff303b;
+  --danger-hover: #e02832;
+
+  --border-color: rgba(255,255,255,0.08);
+  --shadow: 0 2px 12px rgba(0,0,0,0.50), 0 1px 3px rgba(0,0,0,0.30);
+  --elevation-high: 0 24px 64px rgba(0,0,0,0.60), 0 8px 24px rgba(0,0,0,0.40);
+  --glow: 0 0 0 3px rgba(253,107,26,0.25);
+
+  --glass-sidebar:    rgba(14,15,19,0.80);
+  --glass-panel:      rgba(26,27,33,0.70);
+  --glass-float:      rgba(18,19,22,0.88);
+  --glass-modal:      rgba(18,19,22,0.92);
+  --glass-border:     rgba(255,255,255,0.10);
+  --glass-border-lg:  rgba(255,255,255,0.16);
+}
+[data-theme="virtual"] body {
+  background:
+    radial-gradient(ellipse 70% 55% at 15% 60%, rgba(253,107,26,0.20) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 85% 20%, rgba(255,0,87,0.14) 0%, transparent 55%),
+    radial-gradient(ellipse 55% 45% at 65% 88%, rgba(130,32,214,0.16) 0%, transparent 55%),
+    radial-gradient(ellipse 80% 60% at 50% 50%, rgba(18,19,22,0.92) 0%, transparent 100%),
+    #121316;
+}
+
+
+/* ============================================================
+   Virtual Light theme — Virtual Global Trading brand (vgt.energy)
+   Clean white with the VGT orange accent
+   ============================================================ */
+:root[data-theme="virtual-light"] {
+  --bg-1: #ffffff;
+  --bg-2: #f4f4f5;
+  --bg-3: #fafafa;
+  --bg-4: #ffffff;
+  --bg-input: rgba(0,0,0,0.05);
+  --bg-hover: rgba(0,0,0,0.04);
+  --bg-active: rgba(0,0,0,0.08);
+  --bg-modifier-selected: rgba(0,0,0,0.10);
+
+  --text-normal: #27272a;
+  --text-muted: #71717a;
+  --text-link: #e55a0f;
+  --header-primary: #18181b;
+  --header-secondary: #52525b;
+  --interactive-normal: #52525b;
+  --interactive-hover: #27272a;
+  --interactive-active: #18181b;
+  --interactive-muted: #d4d4d8;
+  --channels-default: #52525b;
+
+  --brand: #fd6b1a;
+  --brand-hover: #e55a0f;
+  --brand-active: #cc4f0d;
+  --brand-click: #cc4f0d;
+
+  --status-online: #34a463;
+  --status-idle: #f79300;
+  --status-dnd: #e62a35;
+  --status-offline: #a1a1aa;
+  --status-streaming: #8f38db;
+
+  --danger: #e62a35;
+  --danger-hover: #c42129;
+
+  --border-color: rgba(0,0,0,0.10);
+  --scrollbar-thumb: rgba(0,0,0,0.18);
+  --shadow: 0 2px 12px rgba(0,0,0,0.08), 0 1px 3px rgba(0,0,0,0.05);
+  --elevation-high: 0 24px 64px rgba(0,0,0,0.11), 0 8px 24px rgba(0,0,0,0.06);
+  --glow: 0 0 0 3px rgba(253,107,26,0.25);
+
+  --glass-sidebar:    rgba(244,244,245,0.82);
+  --glass-panel:      rgba(255,255,255,0.76);
+  --glass-surface:    rgba(0,0,0,0.035);
+  --glass-float:      rgba(255,255,255,0.92);
+  --glass-modal:      rgba(244,244,245,0.94);
+  --glass-card:       rgba(0,0,0,0.03);
+  --glass-input:      rgba(0,0,0,0.05);
+  --glass-border:     rgba(0,0,0,0.10);
+  --glass-border-lg:  rgba(0,0,0,0.16);
+  --glass-highlight:        inset 0 1px 0 rgba(255,255,255,0.85);
+  --glass-highlight-strong: inset 0 1px 0 rgba(255,255,255,0.95);
+  --glass-shadow:     0 8px 32px rgba(0,0,0,0.08), 0 2px 8px rgba(0,0,0,0.05), inset 0 1px 0 rgba(255,255,255,0.85);
+  --glass-shadow-lg:  0 24px 64px rgba(0,0,0,0.11), 0 8px 24px rgba(0,0,0,0.07), inset 0 1px 0 rgba(255,255,255,0.85);
+}
+
+
+/* ============================================================
    Theme picker — swatch card grid
    ============================================================ */
 .settings-theme-group-label {
