@@ -1755,7 +1755,7 @@ const ALL_EMOJIS: { emoji: string; keywords: string }[] = [
   { emoji: '🔳', keywords: 'white square button' },
 ]
 
-function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void }) {
+export function ReactionPicker({ onPick, onClose }: { onPick: (emoji: string) => void; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null)
   const [search, setSearch] = useState('')
   const [flipUp, setFlipUp] = useState(false)

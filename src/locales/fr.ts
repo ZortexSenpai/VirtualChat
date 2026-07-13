@@ -116,6 +116,7 @@ const fr: Record<string, string> = {
   'composer.moreOptions': 'Plus d’options',
   'composer.sendMessage': 'Envoyer le message',
   'composer.sendGif': 'Envoyer un GIF',
+  'composer.emoji': 'Émoji',
   'composer.editing': 'Modification du message',
   'composer.replyingTo': 'Réponse à',
   'composer.cancelEdit': 'Annuler la modification',

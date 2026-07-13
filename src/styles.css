@@ -1925,6 +1925,13 @@ body {
   opacity: 0.7;
 }
 
+/* Anchor for the composer emoji picker popover. */
+.input-emoji {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
 .input-btn {
   width: 36px;
   height: 36px;
