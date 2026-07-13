@@ -3024,16 +3024,16 @@ export default function ChatArea({
             <button
               className="icon-btn"
               onClick={() => placeVoiceCall(activeRoom.roomId)}
-              title="Start voice call"
-              disabled={!!activeCall}
+              title={state.voipSupported ? 'Start voice call' : 'Calls are not supported by your homeserver'}
+              disabled={!!activeCall || !state.voipSupported}
             >
               <CallIcon />
             </button>
             <button
               className="icon-btn"
               onClick={() => placeVideoCall(activeRoom.roomId)}
-              title="Start video call"
-              disabled={!!activeCall}
+              title={state.voipSupported ? 'Start video call' : 'Calls are not supported by your homeserver'}
+              disabled={!!activeCall || !state.voipSupported}
             >
               <VideoCallIcon />
             </button>

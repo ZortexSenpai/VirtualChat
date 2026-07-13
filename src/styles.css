@@ -832,6 +832,16 @@ body {
   background: var(--bg-hover);
 }
 
+.chat-header .icon-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.chat-header .icon-btn:disabled:hover {
+  color: var(--interactive-normal);
+  background: transparent;
+}
+
 .message-list {
   flex: 1;
   overflow-y: auto;

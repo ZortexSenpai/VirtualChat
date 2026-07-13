@@ -27,7 +27,7 @@ import { CryptoEvent } from 'matrix-js-sdk/lib/crypto-api/CryptoEvent'
 import { VerificationPhase } from 'matrix-js-sdk/lib/crypto-api/verification'
 import type { VerificationRequest } from 'matrix-js-sdk/lib/crypto-api/verification'
 import { decodeRecoveryKey } from 'matrix-js-sdk/lib/crypto-api'
-import { MatrixCall, CallEvent, CallState, CallErrorCode, CallDirection } from 'matrix-js-sdk/lib/webrtc/call'
+import { MatrixCall, CallEvent, CallState, CallErrorCode, CallDirection, supportsMatrixCall } from 'matrix-js-sdk/lib/webrtc/call'
 import { CallEventHandlerEvent } from 'matrix-js-sdk/lib/webrtc/callEventHandler'
 import { handleIncomingEvent, startCallRingtone, stopCallRingtone } from '../services/notifications'
 
@@ -160,6 +160,8 @@ export interface MatrixState {
   readMarkerEventId: string | null
   ignoredUserIds: string[]
   myBannerMxc: string | null
+  /** Whether voice/video calls can work: browser WebRTC + homeserver TURN support. */
+  voipSupported: boolean
 }
 
 type Action =
@@ -187,6 +189,7 @@ type Action =
   | { type: 'SET_READ_MARKER'; eventId: string | null }
   | { type: 'SET_IGNORED_USERS'; userIds: string[] }
   | { type: 'SET_MY_BANNER'; mxc: string | null }
+  | { type: 'SET_VOIP_SUPPORTED'; supported: boolean }
 
 function readLocalSpaceOrder(): string[] {
   try {
@@ -222,6 +225,7 @@ const initialState: MatrixState = {
   readMarkerEventId: null,
   ignoredUserIds: [],
   myBannerMxc: null,
+  voipSupported: true,
 }
 
 function reducer(state: MatrixState, action: Action): MatrixState {
@@ -294,6 +298,8 @@ function reducer(state: MatrixState, action: Action): MatrixState {
       return { ...state, ignoredUserIds: action.userIds }
     case 'SET_MY_BANNER':
       return { ...state, myBannerMxc: action.mxc }
+    case 'SET_VOIP_SUPPORTED':
+      return { ...state, voipSupported: action.supported }
     case 'LOGOUT':
       return { ...initialState }
     default:
@@ -751,6 +757,7 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
       if (syncState === SyncState.Prepared) {
         fetchUserBanner(userId).then(mxc => dispatch({ type: 'SET_MY_BANNER', mxc })).catch(() => {})
         hasCompletedInitialSyncRef.current = true
+        detectVoipSupport(client)
       }
       // After the initial sync, pick up any verification request that arrived
       // during startup (the CryptoEvent may have fired before React was ready).
@@ -2135,6 +2142,30 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
     }
     activeCallRef.current = null
     setActiveCall(null)
+  }
+
+  /**
+   * Calls need two things: WebRTC in the browser and a TURN server from the
+   * homeserver (GET /voip/turnServer). A 200 with no `uris` (e.g. Synapse with
+   * no turn_uris configured), a 404/M_UNRECOGNIZED, or a 403 all mean calls
+   * can't realistically connect across networks, so the call buttons get
+   * disabled. Transient errors (network blips) leave the default (enabled)
+   * untouched rather than flapping the UI.
+   */
+  async function detectVoipSupport(client: MatrixClient) {
+    if (!supportsMatrixCall()) {
+      dispatch({ type: 'SET_VOIP_SUPPORTED', supported: false })
+      return
+    }
+    try {
+      const res: any = await (client as any).turnServer()
+      const uris = res?.uris
+      dispatch({ type: 'SET_VOIP_SUPPORTED', supported: Array.isArray(uris) && uris.length > 0 })
+    } catch (err: any) {
+      if (err?.httpStatus === 404 || err?.httpStatus === 403 || err?.errcode === 'M_UNRECOGNIZED') {
+        dispatch({ type: 'SET_VOIP_SUPPORTED', supported: false })
+      }
+    }
   }
 
   function placeVoiceCall(roomId: string) {
