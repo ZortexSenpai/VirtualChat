@@ -1567,7 +1567,18 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
   async function joinRoom(roomId: string): Promise<string> {
     const client = clientRef.current
     if (!client) throw new Error('Not connected')
+    // m.direct is per-user account data, so the sender's createDM() can't mark
+    // the room as a DM for us. The is_direct flag lives on our invite membership
+    // event and is gone once we join, so capture the inviter first.
+    const dmInviter = client.getRoom(roomId)?.getDMInviter()
     const room = await client.joinRoom(roomId)
+    if (dmInviter) {
+      const dmContent = (client.getAccountData('m.direct' as any)?.getContent() ?? {}) as Record<string, string[]>
+      const existing = dmContent[dmInviter] ?? []
+      if (!existing.includes(room.roomId)) {
+        await client.setAccountData('m.direct' as any, { ...dmContent, [dmInviter]: [...existing, room.roomId] } as any)
+      }
+    }
     refreshRooms()
     return room.roomId
   }
