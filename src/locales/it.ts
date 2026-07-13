@@ -57,6 +57,7 @@ const it: Record<string, string> = {
   'sidebar.decline': 'Rifiuta',
   'sidebar.unpin': 'Rimuovi',
   'sidebar.roomOptions': 'Opzioni stanza',
+  'sidebar.spaceSettings': 'Impostazioni dello spazio',
   'sidebar.noRoomsFound': 'Nessuna stanza trovata.',
   'sidebar.loadingRooms': 'Caricamento stanze…',
 

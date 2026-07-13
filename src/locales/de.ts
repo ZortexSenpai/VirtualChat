@@ -57,6 +57,7 @@ const de: Record<string, string> = {
   'sidebar.decline': 'Ablehnen',
   'sidebar.unpin': 'Lösen',
   'sidebar.roomOptions': 'Raumoptionen',
+  'sidebar.spaceSettings': 'Space-Einstellungen',
   'sidebar.noRoomsFound': 'Keine Räume gefunden.',
   'sidebar.loadingRooms': 'Räume werden geladen…',
 

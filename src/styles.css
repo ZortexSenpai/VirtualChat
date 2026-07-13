@@ -531,9 +531,12 @@ body {
   justify-content: space-between;
   border-bottom: 1px solid rgba(255, 255, 255, 0.07);
   flex-shrink: 0;
-  cursor: pointer;
   transition: background 0.1s;
   box-shadow: 0 1px 0 rgba(255, 255, 255, 0.04);
+}
+
+.sidebar-header--clickable {
+  cursor: pointer;
 }
 
 .space-banner {
@@ -588,7 +591,7 @@ body {
   border-radius: 4px;
 }
 
-.sidebar-header:hover {
+.sidebar-header--clickable:hover {
   background: var(--bg-hover);
 }
 

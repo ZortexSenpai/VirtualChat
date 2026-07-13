@@ -57,6 +57,7 @@ const fr: Record<string, string> = {
   'sidebar.decline': 'Refuser',
   'sidebar.unpin': 'Désépingler',
   'sidebar.roomOptions': 'Options du salon',
+  'sidebar.spaceSettings': 'Paramètres de l\'espace',
   'sidebar.noRoomsFound': 'Aucun salon trouvé.',
   'sidebar.loadingRooms': 'Chargement des salons…',
 
