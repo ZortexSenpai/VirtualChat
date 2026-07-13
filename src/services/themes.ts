@@ -25,6 +25,7 @@ export const DARK_THEMES: Theme[] = [
   { id: 'rose-pine',   label: 'Rosé Pine',        mode: 'dark', colors: ['#191724', '#1f1d2e', '#c4a7e7'] },
   { id: 'everforest',  label: 'Everforest',       mode: 'dark', colors: ['#2d353b', '#343f44', '#a7c080'] },
   { id: 'monokai',     label: 'Monokai',          mode: 'dark', colors: ['#272822', '#1e1f1c', '#a6e22e'] },
+  { id: 'virtual',     label: 'Virtual',          mode: 'dark', colors: ['#121316', '#1c1d24', '#fd6b1a'] },
 ]
 
 export const LIGHT_THEMES: Theme[] = [
@@ -33,6 +34,13 @@ export const LIGHT_THEMES: Theme[] = [
   { id: 'catppuccin-latte', label: 'Catppuccin Latte', mode: 'light', colors: ['#eff1f5', '#e6e9ef', '#8839ef'] },
   { id: 'nord-light',       label: 'Nord Light',       mode: 'light', colors: ['#eceff4', '#e5e9f0', '#5e81ac'] },
   { id: 'rose-pine-dawn',   label: 'Rosé Pine Dawn',   mode: 'light', colors: ['#faf4ed', '#fffaf3', '#907aa9'] },
+  { id: 'github-light',     label: 'GitHub Light',     mode: 'light', colors: ['#ffffff', '#f6f8fa', '#0969da'] },
+  { id: 'one-light',        label: 'One Light',        mode: 'light', colors: ['#fafafa', '#eaeaeb', '#4078f2'] },
+  { id: 'gruvbox-light',    label: 'Gruvbox Light',    mode: 'light', colors: ['#fbf1c7', '#ebdbb2', '#b57614'] },
+  { id: 'everforest-light', label: 'Everforest Light', mode: 'light', colors: ['#f3ead3', '#eae4ca', '#8da101'] },
+  { id: 'tokyo-night-day',  label: 'Tokyo Night Day',  mode: 'light', colors: ['#e1e2e7', '#d6d8df', '#2e7de9'] },
+  { id: 'ayu-light',        label: 'Ayu Light',        mode: 'light', colors: ['#fcfcfc', '#f3f4f5', '#fa8d3e'] },
+  { id: 'virtual-light',    label: 'Virtual Light',    mode: 'light', colors: ['#ffffff', '#f4f4f5', '#fd6b1a'] },
 ]
 
 export const ALL_THEMES: Theme[] = [...DARK_THEMES, ...LIGHT_THEMES]
