@@ -1234,6 +1234,9 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
         <button
           className="input-btn"
           title={t('composer.sendGif')}
+          // The picker closes itself on any outside mousedown; swallow ours so
+          // a click on the toggle doesn't close-then-reopen it.
+          onMouseDown={e => { e.preventDefault(); e.stopPropagation() }}
           onClick={() => setShowGif(v => !v)}
           disabled={!state.activeRoomId || recording}
           type="button"

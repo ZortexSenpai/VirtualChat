@@ -116,6 +116,28 @@ html[data-glass="off"] body {
   background: var(--glass-panel);
 }
 
+/* Dark themes + glass off: the flat #0c0e1e above matches the DEFAULT theme's
+   panels but never changes when the user picks another dark theme — and the
+   faint white-tint surfaces layered on it (e.g. the classic-layout member
+   list's --glass-card) inherit that stuck color. Use each theme's own main
+   background instead; the per-theme translucent panel tokens blend into it
+   the same way the hardcoded pair used to. */
+html[data-theme-mode="dark"][data-glass="off"] body {
+  background: var(--bg-1);
+}
+
+/* Dark themes + glass off: the per-theme :root[data-theme="…"] token blocks
+   outrank the opaque fallbacks above, so popovers (GIF/emoji picker, menus,
+   modals) kept their translucent glass values with no blur behind them. Pin
+   all surface tokens to the theme's own opaque background scale instead —
+   panels match the flat body, sidebar darkest, floats/modals one step off. */
+html[data-theme-mode="dark"][data-glass="off"] {
+  --glass-sidebar: var(--bg-4);
+  --glass-panel:   var(--bg-1);
+  --glass-float:   var(--bg-2);
+  --glass-modal:   var(--bg-2);
+}
+
 /* Light themes + glass off: the dark fallbacks above would paint a dark page
    under light panels. Use the theme's own background scale instead — mirroring
    the dark glass-off look (panels match the body, sidebar a step darker,
@@ -139,6 +161,7 @@ html[data-theme-mode="light"][data-glass="off"] body {
    the shadow here so the sidebars read as clean as the chat window. */
 [data-glass="off"] .channel-sidebar,
 [data-glass="off"] .member-list,
+[data-glass="off"] .chat-main,
 [data-glass="off"][data-sidenav="unified"] .space-bar {
   box-shadow: none;
 }
@@ -789,7 +812,9 @@ body {
   position: relative;
   border: 1px solid var(--glass-border);
   border-radius: 16px;
-  box-shadow: var(--glass-shadow);
+  /* Only the inset highlight: an outer drop shadow gets clipped square by
+     .chat-area's overflow:hidden, leaving a boxy artifact at the edges. */
+  box-shadow: var(--glass-highlight);
 }
 
 .chat-header {
@@ -1531,10 +1556,10 @@ body {
   display: flex;
   gap: 2px;
   opacity: 0;
-  background: rgba(14, 16, 34, 0.72);
+  background: var(--glass-float);
   backdrop-filter: var(--glass-blur-md);
   -webkit-backdrop-filter: var(--glass-blur-md);
-  border: 1px solid rgba(255, 255, 255, 0.12);
+  border: 1px solid var(--glass-border);
   border-radius: 10px;
   padding: 3px;
   box-shadow: var(--glass-shadow);
@@ -1574,10 +1599,10 @@ body {
   display: flex;
   gap: 4px;
   padding: 8px 10px;
-  background: rgba(12, 14, 30, 0.82);
+  background: var(--glass-float);
   backdrop-filter: var(--glass-blur-md);
   -webkit-backdrop-filter: var(--glass-blur-md);
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 1px solid var(--glass-border-lg);
   border-radius: 14px;
   box-shadow: var(--glass-shadow-lg);
   z-index: 100;
@@ -1676,10 +1701,10 @@ body {
 .profile-popup {
   position: fixed;
   width: 280px;
-  background: rgba(10, 11, 26, 0.82);
+  background: var(--glass-float);
   backdrop-filter: var(--glass-blur-lg);
   -webkit-backdrop-filter: var(--glass-blur-lg);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--glass-border-lg);
   border-radius: 18px;
   box-shadow: var(--glass-shadow-lg);
   z-index: 200;
@@ -2117,10 +2142,10 @@ body {
   left: 16px;
   width: 480px;
   height: 420px;
-  background: rgba(10, 12, 28, 0.84);
+  background: var(--glass-float);
   backdrop-filter: var(--glass-blur-lg);
   -webkit-backdrop-filter: var(--glass-blur-lg);
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 1px solid var(--glass-border-lg);
   border-radius: 18px;
   box-shadow: var(--glass-shadow-lg);
   display: flex;
@@ -2927,10 +2952,10 @@ body {
 }
 
 .verification-modal {
-  background: rgba(11, 12, 28, 0.82);
+  background: var(--glass-modal);
   backdrop-filter: var(--glass-blur-lg);
   -webkit-backdrop-filter: var(--glass-blur-lg);
-  border: 1px solid rgba(255, 255, 255, 0.14);
+  border: 1px solid var(--glass-border-lg);
   border-radius: 22px;
   width: 460px;
   max-width: 92vw;
@@ -4241,14 +4266,13 @@ body {
 .room-ctx-menu {
   position: fixed;
   width: 224px;
-  background: rgba(10, 12, 28, 0.90);
+  background: var(--glass-float);
   backdrop-filter: blur(28px) saturate(180%);
   -webkit-backdrop-filter: blur(28px) saturate(180%);
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 1px solid var(--glass-border-lg);
   border-radius: 12px;
   padding: 6px;
-  box-shadow: 0 16px 48px rgba(0, 0, 0, 0.55), 0 4px 16px rgba(0, 0, 0, 0.35),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: var(--glass-shadow-lg);
   z-index: 9000;
   user-select: none;
 }
@@ -4395,13 +4419,12 @@ body {
   flex-direction: column;
   width: min(560px, 92vw);
   max-height: min(680px, 90vh);
-  background: rgba(10, 11, 26, 0.88);
+  background: var(--glass-modal);
   backdrop-filter: blur(48px) saturate(200%);
   -webkit-backdrop-filter: blur(48px) saturate(200%);
-  border: 1px solid rgba(255, 255, 255, 0.13);
+  border: 1px solid var(--glass-border-lg);
   border-radius: 20px;
-  box-shadow: 0 32px 80px rgba(0, 0, 0, 0.65), 0 8px 24px rgba(0, 0, 0, 0.4),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  box-shadow: var(--glass-shadow-lg);
   overflow: hidden;
 }
 
@@ -4989,30 +5012,10 @@ body {
   background: var(--glass-panel);
 }
 
-/* Floating popovers whose dark glass background is hardcoded (not tokenized):
-   emoji/reaction picker, message hover actions, profile popup, GIF picker,
-   room context menu. --glass-float is theme-defined, so each light theme
-   keeps its own tint (and the glass-off override makes it opaque). */
-[data-theme-mode="light"] .reaction-picker,
-[data-theme-mode="light"] .message-actions,
-[data-theme-mode="light"] .profile-popup,
-[data-theme-mode="light"] .gif-picker,
-[data-theme-mode="light"] .quick-switcher,
-[data-theme-mode="light"] .room-ctx-menu {
-  background: var(--glass-float);
-  border-color: var(--glass-border-lg);
-}
-
-[data-theme-mode="light"] .room-ctx-menu {
-  box-shadow: var(--glass-shadow-lg);
-}
-
-[data-theme-mode="light"] .verification-modal,
-[data-theme-mode="light"] .room-settings-modal {
-  background: var(--glass-modal);
-  border-color: var(--glass-border-lg);
-  box-shadow: var(--glass-shadow-lg);
-}
+/* Popover/modal surfaces (emoji-reaction picker, GIF picker, profile popup,
+   quick switcher, context menu, verification/room-settings modals) use the
+   theme glass tokens directly in their base rules, so both dark and light
+   themes color them correctly without overrides here. */
 
 /* White-tint separators and inputs inside those popovers flip to black tints */
 [data-theme-mode="light"] .reaction-picker-search {
@@ -10435,7 +10438,7 @@ body {
 .quick-switcher {
   width: 560px;
   max-width: 92vw;
-  background: rgba(12, 14, 30, 0.82);
+  background: var(--glass-float);
   border: 1px solid var(--glass-border);
   border-radius: 14px;
   box-shadow: var(--glass-shadow-lg);

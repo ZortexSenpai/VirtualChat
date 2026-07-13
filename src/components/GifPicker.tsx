@@ -59,6 +59,7 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
   const [addError, setAddError] = useState<string | null>(null)
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const sentinelRef = useRef<HTMLDivElement>(null)
+  const rootRef = useRef<HTMLDivElement>(null)
   // Invalidates in-flight requests when the query changes mid-fetch.
   const fetchVersionRef = useRef(0)
 
@@ -132,6 +133,16 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
     return () => window.removeEventListener('keydown', onKey)
   }, [onClose, packMenuGif])
 
+  // Close on any mousedown outside the picker (the composer's GIF toggle
+  // swallows its own mousedown so it doesn't close-then-reopen).
+  useEffect(() => {
+    function onDocMouseDown(e: MouseEvent) {
+      if (rootRef.current && !rootRef.current.contains(e.target as Node)) onClose()
+    }
+    document.addEventListener('mousedown', onDocMouseDown)
+    return () => document.removeEventListener('mousedown', onDocMouseDown)
+  }, [onClose])
+
   function isFavorited(url: string) {
     return favorites.some(f => f.url === url)
   }
@@ -201,7 +212,7 @@ export default function GifPicker({ onSelect, onClose }: GifPickerProps) {
   }).filter(Boolean) as { id: string | number; thumb: string; full: string; title: string }[]
 
   return (
-    <div className="gif-picker">
+    <div className="gif-picker" ref={rootRef}>
       <div className="gif-picker-header">
         <div className="gif-picker-tabs-row">
           <button
