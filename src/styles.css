@@ -6407,6 +6407,12 @@ body {
   opacity: 1;
 }
 
+/* Unencrypted rooms: muted open padlock instead of the green closed one */
+.header-e2ee-badge--off {
+  color: var(--text-muted);
+  opacity: 0.7;
+}
+
 /* ---- DM search results ---- */
 .dm-search-results {
   max-height: 180px;
@@ -10235,6 +10241,118 @@ body {
   max-width: 440px;
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
+}
+
+/* ---- Generic file attachment card (m.file) ---- */
+.file-message {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  background: var(--glass-surface);
+  border: 1px solid var(--glass-border);
+  border-radius: 10px;
+  max-width: 440px;
+  backdrop-filter: var(--glass-blur);
+  -webkit-backdrop-filter: var(--glass-blur);
+}
+
+.file-message-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  color: var(--text-link);
+}
+
+.file-message-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.file-message-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--header-primary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-message-meta {
+  font-size: 12px;
+  color: var(--text-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-message-meta--error {
+  color: #fca5a5;
+}
+
+.file-message-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: none;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--interactive-normal);
+  cursor: pointer;
+  transition: background 0.1s, color 0.1s;
+}
+
+.file-message-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  color: var(--interactive-hover);
+}
+
+.file-message-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* The base 36px spinner gets width-squished inside the 30px flex button
+   (flex-shrink narrows it, height stays) — size it to fit and pin the ratio. */
+.file-message-btn .spinner {
+  width: 14px;
+  height: 14px;
+  border-width: 2px;
+  flex-shrink: 0;
+}
+
+/* In-app text preview modal (.json / .txt / .sh / .yaml attachments) */
+.file-preview-card {
+  width: min(760px, 92vw);
+  max-height: 82vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.file-preview-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-preview-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  margin-top: 10px;
+}
+
+.file-preview-body pre {
+  margin: 0;
+}
+
+.file-preview-truncated {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .audio-message audio {

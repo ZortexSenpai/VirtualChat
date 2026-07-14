@@ -1135,6 +1135,231 @@ function AudioMessage({ mxcUrl, client, mimetype, isVoice, duration, waveform, f
   )
 }
 
+// ---- Generic file attachment (m.file) ----
+
+function formatFileSize(bytes?: number): string | null {
+  if (typeof bytes !== 'number' || !Number.isFinite(bytes)) return null
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  if (bytes < 1024 ** 3) return `${(bytes / 1024 ** 2).toFixed(1)} MB`
+  return `${(bytes / 1024 ** 3).toFixed(2)} GB`
+}
+
+/** Mimetypes the browser can render directly in a tab for a quick preview. */
+function isPreviewableMimetype(mimetype?: string): boolean {
+  if (!mimetype) return false
+  return mimetype === 'application/pdf'
+    || mimetype.startsWith('text/')
+    || mimetype.startsWith('image/')
+    || mimetype.startsWith('video/')
+    || mimetype.startsWith('audio/')
+}
+
+/* Text-like files previewed in an in-app modal (extension → highlight.js
+   language). Extension-based because these often ship with mimetypes the
+   browser refuses to display (application/x-sh, application/x-yaml) or with
+   no mimetype at all. */
+const TEXT_PREVIEW_LANGUAGES: Record<string, string> = {
+  json: 'json',
+  txt: 'plaintext',
+  sh: 'bash',
+  bash: 'bash',
+  yml: 'yaml',
+  yaml: 'yaml',
+}
+
+function textPreviewLanguage(fileName: string): string | null {
+  const ext = fileName.toLowerCase().match(/\.([a-z0-9]+)$/)?.[1]
+  return ext ? TEXT_PREVIEW_LANGUAGES[ext] ?? null : null
+}
+
+const TEXT_PREVIEW_MAX_CHARS = 200_000
+
+function TextPreviewModal({ fileName, language, text, truncated, onClose }: {
+  fileName: string
+  language: string
+  text: string
+  truncated: boolean
+  onClose: () => void
+}) {
+  useEffect(() => {
+    const onKey = (e: globalThis.KeyboardEvent) => { if (e.key === 'Escape') onClose() }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  // Render through the app's markdown pipeline so highlight.js theming applies.
+  // The fence must be longer than any backtick run inside the file content.
+  let maxBacktickRun = 0
+  for (const run of text.match(/`+/g) ?? []) {
+    if (run.length > maxBacktickRun) maxBacktickRun = run.length
+  }
+  const fence = '`'.repeat(Math.max(3, maxBacktickRun + 1))
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-card file-preview-card">
+        <h2 className="file-preview-title" title={fileName}>{fileName}</h2>
+        <div className="file-preview-body markdown-body">
+          <ReactMarkdown rehypePlugins={MD_REHYPE_PLUGINS}>{`${fence}${language}\n${text}\n${fence}`}</ReactMarkdown>
+        </div>
+        {truncated && <p className="file-preview-truncated">Preview truncated — download the file for the full content.</p>}
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={onClose}>Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function FileMessage({ mxcUrl, client, fileName, mimetype, size, encryptedFile }: {
+  mxcUrl?: string
+  client: any
+  fileName: string
+  mimetype?: string
+  size?: number
+  encryptedFile?: EncryptedFileInfo
+}) {
+  const [busy, setBusy] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+  const [textPreview, setTextPreview] = useState<{ text: string; truncated: boolean } | null>(null)
+  const blobUrlRef = useRef<string | null>(null)
+  const textLang = textPreviewLanguage(fileName)
+
+  // Fetched lazily on first preview/download click, then reused.
+  async function getBlobUrl(): Promise<string | null> {
+    if (blobUrlRef.current) return blobUrlRef.current
+    let url: string | null = null
+    if (encryptedFile) {
+      const blob = await fetchAndDecryptAttachment(encryptedFile, client)
+      url = URL.createObjectURL(mimetype ? new Blob([blob], { type: mimetype }) : blob)
+    } else if (mxcUrl) {
+      url = await fetchMediaBlobUrl(mxcUrl, client)
+    }
+    blobUrlRef.current = url
+    return url
+  }
+
+  useEffect(() => () => {
+    if (blobUrlRef.current) URL.revokeObjectURL(blobUrlRef.current)
+  }, [])
+
+  async function handleDownload() {
+    setBusy(true)
+    setError(null)
+    try {
+      const url = await getBlobUrl()
+      if (!url) throw new Error('download failed')
+      const a = document.createElement('a')
+      a.href = url
+      a.download = fileName
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+    } catch {
+      setError('Download failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  async function handlePreview() {
+    setBusy(true)
+    setError(null)
+
+    // Text-like files render in an in-app modal (their mimetypes often can't
+    // be displayed by the browser tab at all).
+    if (textLang) {
+      try {
+        const url = await getBlobUrl()
+        if (!url) throw new Error('preview failed')
+        let text = await (await fetch(url)).text()
+        const truncated = text.length > TEXT_PREVIEW_MAX_CHARS
+        if (truncated) text = text.slice(0, TEXT_PREVIEW_MAX_CHARS)
+        setTextPreview({ text, truncated })
+      } catch {
+        setError('Preview failed')
+      } finally {
+        setBusy(false)
+      }
+      return
+    }
+
+    // Open the tab synchronously (before the await) so pop-up blockers don't
+    // eat it, then point it at the fetched blob.
+    const win = window.open('', '_blank')
+    try {
+      const url = await getBlobUrl()
+      if (!url) throw new Error('preview failed')
+      if (win) win.location.href = url
+    } catch {
+      win?.close()
+      setError('Preview failed')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const meta = [formatFileSize(size), mimetype].filter(Boolean).join(' · ')
+
+  return (
+    <div className="message-body file-message">
+      <div className="file-message-icon" aria-hidden="true"><FileAttachmentIcon /></div>
+      <div className="file-message-info">
+        <div className="file-message-name" title={fileName}>{fileName}</div>
+        <div className={`file-message-meta${error ? ' file-message-meta--error' : ''}`}>
+          {error ?? (meta || 'File')}
+        </div>
+      </div>
+      {(textLang !== null || isPreviewableMimetype(mimetype)) && (
+        <button className="file-message-btn" onClick={handlePreview} disabled={busy} title="Preview">
+          <FilePreviewIcon />
+        </button>
+      )}
+      <button className="file-message-btn" onClick={handleDownload} disabled={busy} title="Download">
+        {busy ? <span className="spinner" /> : <FileDownloadIcon />}
+      </button>
+      {textPreview && textLang && (
+        <TextPreviewModal
+          fileName={fileName}
+          language={textLang}
+          text={textPreview.text}
+          truncated={textPreview.truncated}
+          onClose={() => setTextPreview(null)}
+        />
+      )}
+    </div>
+  )
+}
+
+function FileAttachmentIcon() {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+      <polyline points="14 2 14 8 20 8" />
+    </svg>
+  )
+}
+
+function FileDownloadIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+      <polyline points="7 10 12 15 17 10" />
+      <line x1="12" y1="15" x2="12" y2="3" />
+    </svg>
+  )
+}
+
+function FilePreviewIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" />
+      <circle cx="12" cy="12" r="3" />
+    </svg>
+  )
+}
+
 // ---- Poll message ----
 
 function pollText(text: any): string {
@@ -1401,6 +1626,26 @@ function MessageContent({ event, client }: { event: MatrixEvent; client: any }) 
     const duration = content['org.matrix.msc1767.audio']?.duration ?? content.info?.duration
     const waveform = content['org.matrix.msc1767.audio']?.waveform as number[] | undefined
     return <>{replyQuote}<AudioMessage mxcUrl={rawUrl} client={client} mimetype={content.info?.mimetype} isVoice={isVoice} duration={duration} waveform={waveform} fileName={content.body || 'audio'} /></>
+  }
+
+  // Generic file attachment — download card (encrypted rooms put the mxc URL
+  // + keys in content.file instead of content.url)
+  if (msgtype === MsgType.File || msgtype === 'm.file') {
+    const encryptedFile = content.file as EncryptedFileInfo | undefined
+    const rawUrl = content.url as string | undefined
+    return (
+      <>
+        {replyQuote}
+        <FileMessage
+          mxcUrl={rawUrl}
+          client={client}
+          fileName={content.filename || content.body || 'file'}
+          mimetype={content.info?.mimetype}
+          size={content.info?.size}
+          encryptedFile={encryptedFile}
+        />
+      </>
+    )
   }
 
   // Strip the Matrix reply fallback lines ("> text\n\n") from the rendered body.
@@ -3026,10 +3271,16 @@ export default function ChatArea({
               <MembersIcon />
               {activeRoom.getJoinedMembers().length}
             </button>
-            {activeRoom.currentState.getStateEvents('m.room.encryption', '') && (
+            {activeRoom.currentState.getStateEvents('m.room.encryption', '') ? (
               <span className="header-e2ee-badge" title="End-to-end encrypted">
                 <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
                   <path d="M18 8h-1V6A5 5 0 0 0 7 6v2H6a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V10a2 2 0 0 0-2-2zm-6 9a2 2 0 1 1 0-4 2 2 0 0 1 0 4zm3.1-9H8.9V6a3.1 3.1 0 0 1 6.2 0v2z" />
+                </svg>
+              </span>
+            ) : (
+              <span className="header-e2ee-badge header-e2ee-badge--off" title="Not end-to-end encrypted">
+                <svg viewBox="0 0 24 24" width="14" height="14" fill="currentColor" aria-hidden="true">
+                  <path d="M12 17a2 2 0 1 0 0-4 2 2 0 0 0 0 4zm6-9h-1V6c0-2.76-2.24-5-5-5S7 3.24 7 6h1.9c0-1.71 1.39-3.1 3.1-3.1 1.71 0 3.1 1.39 3.1 3.1v2H6c-1.1 0-2 .9-2 2v10c0 1.1.9 2 2 2h12c1.1 0 2-.9 2-2V10c0-1.1-.9-2-2-2z" />
                 </svg>
               </span>
             )}
