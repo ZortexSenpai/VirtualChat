@@ -33,6 +33,7 @@ export const SYNCED_SETTINGS_KEYS = [
   'vc_send_read_receipts',
   'vc_url_previews',
   'vc_gif_hover_play',
+  'vc_gif_pause_unfocused',
   'vc_gif_favorites',
   'vc_show_member_join',
   'vc_show_member_leave',

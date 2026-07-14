@@ -535,19 +535,50 @@ async function fetchAndDecryptAttachment(file: EncryptedFileInfo, client: any): 
   return new Blob([plain])
 }
 
+// Shared window-focus store: one set of listeners for all rendered images
+// instead of per-image focus/blur subscriptions.
+let windowFocusedNow = typeof document !== 'undefined' ? !document.hidden && document.hasFocus() : true
+const windowFocusListeners = new Set<() => void>()
+function updateWindowFocused() {
+  const next = !document.hidden && document.hasFocus()
+  if (next === windowFocusedNow) return
+  windowFocusedNow = next
+  windowFocusListeners.forEach(l => l())
+}
+if (typeof window !== 'undefined') {
+  window.addEventListener('focus', updateWindowFocused)
+  window.addEventListener('blur', updateWindowFocused)
+  document.addEventListener('visibilitychange', updateWindowFocused)
+}
+
+function useWindowFocused(): boolean {
+  return React.useSyncExternalStore(
+    cb => {
+      windowFocusListeners.add(cb)
+      return () => { windowFocusListeners.delete(cb) }
+    },
+    () => windowFocusedNow,
+  )
+}
+
 function MessageImage({ mxcUrl, alt, client, mimetype, forceDownload, clickable = true, encryptedFile }: { mxcUrl: string; alt: string; client: any; mimetype?: string; forceDownload?: boolean; clickable?: boolean; encryptedFile?: EncryptedFileInfo }) {
   const [src, setSrc] = useState<string | null>(null)
   const [staticThumbSrc, setStaticThumbSrc] = useState<string | null>(null)
   const [hovering, setHovering] = useState(false)
   const [failed, setFailed] = useState(false)
   const { open: openLightbox } = useImageViewer()
+  const windowFocused = useWindowFocused()
 
   const [hoverOnlyPlay, setHoverOnlyPlay] = useState(
     () => localStorage.getItem('vc_gif_hover_play') === 'true',
   )
+  const [pauseUnfocused, setPauseUnfocused] = useState(
+    () => localStorage.getItem('vc_gif_pause_unfocused') === 'true',
+  )
   useEffect(() => {
     function onChange() {
       setHoverOnlyPlay(localStorage.getItem('vc_gif_hover_play') === 'true')
+      setPauseUnfocused(localStorage.getItem('vc_gif_pause_unfocused') === 'true')
     }
     window.addEventListener('vc:settings-changed', onChange)
     return () => window.removeEventListener('vc:settings-changed', onChange)
@@ -638,8 +669,9 @@ function MessageImage({ mxcUrl, alt, client, mimetype, forceDownload, clickable 
   // When hover-only GIF playback is on, also fetch a static thumbnail variant
   // so we can show a still frame until the user hovers. The thumbnail endpoint
   // strips animation server-side.
+  const wantsStaticThumb = hoverOnlyPlay || pauseUnfocused
   useEffect(() => {
-    if (!hoverOnlyPlay || !isAnimated || encryptedFile) {
+    if (!wantsStaticThumb || !isAnimated || encryptedFile) {
       setStaticThumbSrc(null)
       return
     }
@@ -670,12 +702,16 @@ function MessageImage({ mxcUrl, alt, client, mimetype, forceDownload, clickable 
       } catch { /* static thumb is best-effort */ }
     })()
     return () => { cancelled = true }
-  }, [hoverOnlyPlay, isAnimated, encryptedFile, mxcUrl, client])
+  }, [wantsStaticThumb, isAnimated, encryptedFile, mxcUrl, client])
 
   if (failed) return <div className="message-body">[image]</div>
   if (!src) return <div className="message-body message-img-loading" />
 
-  const useStaticFrame = hoverOnlyPlay && isAnimated && !encryptedFile && staticThumbSrc && !hovering
+  // Paused when hover-play is on and not hovering, or when pause-unfocused is
+  // on and the window is in the background.
+  const pausedByHover = hoverOnlyPlay && !hovering
+  const pausedByFocus = pauseUnfocused && !windowFocused
+  const useStaticFrame = isAnimated && !encryptedFile && staticThumbSrc && (pausedByHover || pausedByFocus)
   const displaySrc = useStaticFrame ? staticThumbSrc! : src
   const hoverProps = (hoverOnlyPlay && isAnimated && !encryptedFile && staticThumbSrc)
     ? { onMouseEnter: () => setHovering(true), onMouseLeave: () => setHovering(false) }

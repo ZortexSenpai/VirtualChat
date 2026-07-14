@@ -698,6 +698,18 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
     if (result && result.info) setCommandInfo(result.info)
   }
 
+  function friendlySendError(err: any): string {
+    if (
+      err?.message === 'MESSAGE_TOO_LONG'
+      || err?.errcode === 'M_TOO_LARGE'
+      || err?.data?.errcode === 'M_TOO_LARGE'
+      || err?.httpStatus === 413
+    ) {
+      return 'Message is too long to send (Matrix limits events to 64 KB). Split it up or attach it as a text file.'
+    }
+    return err?.data?.error ?? err?.message ?? 'Failed to send message'
+  }
+
   async function handleSend() {
     if (sending) return
     const hasText = text.trim().length > 0
@@ -714,6 +726,7 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
         setText('')
       } catch (err) {
         console.error('Edit failed:', err)
+        setCommandError(friendlySendError(err))
       } finally {
         setSending(false)
       }
@@ -729,6 +742,7 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
         setText('')
       } catch (err) {
         console.error('Send failed:', err)
+        setCommandError(friendlySendError(err))
       } finally {
         setSending(false)
       }
@@ -772,6 +786,7 @@ export default function MessageInput({ roomName, editingEvent, onCancelEdit }: M
       setPendingMentions([])
     } catch (err) {
       console.error('Send failed:', err)
+      setCommandError(friendlySendError(err))
     } finally {
       setSending(false)
     }

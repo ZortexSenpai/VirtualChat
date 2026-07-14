@@ -516,6 +516,32 @@ function buildFormatted(
   return { format: 'org.matrix.custom.html', formatted_body: html }
 }
 
+// Matrix caps whole events at 65536 bytes (federation PDU limit). Leave
+// headroom for the event envelope; in encrypted rooms the content is sent as
+// base64 Megolm ciphertext (~4/3 expansion), so the plaintext budget is lower.
+const MAX_EVENT_CONTENT_BYTES = 60_000
+const MAX_ENCRYPTED_EVENT_CONTENT_BYTES = 40_000
+
+/**
+ * Keep outgoing message content under the event size cap. The HTML copy
+ * (formatted_body) duplicates the text, so drop it first — a plain-text
+ * message beats a rejected one. If the body alone still exceeds the cap,
+ * throw MESSAGE_TOO_LONG so the composer can tell the user.
+ */
+function enforceEventSizeLimit(content: any, encrypted: boolean) {
+  const cap = encrypted ? MAX_ENCRYPTED_EVENT_CONTENT_BYTES : MAX_EVENT_CONTENT_BYTES
+  const size = () => new TextEncoder().encode(JSON.stringify(content)).length
+  if (size() <= cap) return
+  delete content.format
+  delete content.formatted_body
+  if (content['m.new_content']) {
+    delete content['m.new_content'].format
+    delete content['m.new_content'].formatted_body
+  }
+  if (size() <= cap) return
+  throw new Error('MESSAGE_TOO_LONG')
+}
+
 // ---- Provider ----
 
 export function MatrixProvider({ children }: { children: React.ReactNode }) {
@@ -1446,6 +1472,8 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
       content.body = `${quotedBlock}\n\n${trimmed}`
       content['m.relates_to'] = { 'm.in_reply_to': { event_id: replyId } }
     }
+    const encrypted = Boolean(client.getRoom(roomId)?.currentState.getStateEvents('m.room.encryption' as any, ''))
+    enforceEventSizeLimit(content, encrypted)
     await client.sendEvent(roomId, EventType.RoomMessage, content)
     if (replyTo) dispatch({ type: 'SET_REPLY_TO', event: null })
   }
@@ -1651,12 +1679,17 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
   async function editMessage(roomId: string, eventId: string, newBody: string) {
     const client = clientRef.current
     if (!client) return
-    await client.sendMessage(roomId, {
+    // Edits carry the text twice (fallback body + m.new_content) — twice again
+    // with the HTML copies — so long edits hit the event cap early.
+    const content: any = {
       msgtype: 'm.text',
       body: `* ${newBody}`,
       'm.new_content': { msgtype: 'm.text', body: newBody, ...formatFields(newBody) },
       'm.relates_to': { rel_type: 'm.replace', event_id: eventId },
-    } as any)
+    }
+    const encrypted = Boolean(client.getRoom(roomId)?.currentState.getStateEvents('m.room.encryption' as any, ''))
+    enforceEventSizeLimit(content, encrypted)
+    await client.sendMessage(roomId, content)
   }
 
   /**

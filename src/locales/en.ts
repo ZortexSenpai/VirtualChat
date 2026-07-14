@@ -193,6 +193,8 @@ const en: Record<string, string> = {
   'settings.privacy.urlPreviewsDesc': 'Fetch Open Graph metadata for URLs in messages. Disabling avoids contacting your homeserver for link info.',
   'settings.privacy.gifHoverPlayLabel': 'Play GIFs on hover only',
   'settings.privacy.gifHoverPlayDesc': 'Show a static frame for animated images by default; play the animation only while the cursor is over the image.',
+  'settings.privacy.gifPauseUnfocusedLabel': 'Pause GIFs when window is inactive',
+  'settings.privacy.gifPauseUnfocusedDesc': 'Show a static frame for animated images while this window is in the background or another tab is focused.',
   'settings.privacy.useTwemojiLabel': 'Use classic Twitter emoji',
   'settings.privacy.useTwemojiDesc': 'Render emoji in messages and reactions using the Twemoji (classic Twitter) style instead of your system font.',
   'settings.privacy.memberJoinsLabel': 'Member joins',
