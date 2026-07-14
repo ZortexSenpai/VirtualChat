@@ -8513,6 +8513,7 @@ body {
 
 [data-sidenav="modern"] .space-bar {
   padding: 8px 0;
+  border-right: 1px solid var(--glass-border);
 }
 
 [data-sidenav="modern"] .channel-sidebar {
@@ -8573,6 +8574,16 @@ body {
      keep it overlaying the divider as the drag target. */
   [data-sidenav="modern"] .panel-resizer--right {
     margin: 0 -2px;
+  }
+
+  /* Space banner reaches across the 8px gutter so its right edge lands on the
+     chat panel's left border. Needs the sidebar to not clip the overhang —
+     safe on desktop where the modern sidebar is flat and square. */
+  [data-sidenav="modern"] .channel-sidebar {
+    overflow: visible;
+  }
+  [data-sidenav="modern"] .space-banner {
+    width: calc(100% + 12px);
   }
 
 }
