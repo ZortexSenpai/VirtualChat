@@ -101,6 +101,12 @@
   -webkit-backdrop-filter: none;
 }
 
+/* Without the blur, the hover bar's big glass shadow reads as a dark smear
+   over the message text — the opaque background + border carry it alone. */
+[data-glass="off"] .message-actions {
+  box-shadow: none;
+}
+
 /* html[data-glass="off"] (not just [data-glass]) so this outranks the
    per-theme body gradients defined later in the file. Matches --glass-panel
    (rgba(12,14,30)) so the rounded corners of panels blend into the body
@@ -1671,6 +1677,16 @@ body {
   font-size: 14px;
   cursor: pointer;
   transition: background 0.1s, color 0.1s;
+}
+
+/* Quick-react buttons (three most recent emojis) at the start of the bar */
+.message-action-btn--emoji {
+  font-size: 15px;
+  line-height: 1;
+}
+
+.message-action-btn--emoji:hover {
+  transform: scale(1.15);
 }
 
 .message-action-btn:hover {

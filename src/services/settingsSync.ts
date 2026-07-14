@@ -42,6 +42,7 @@ export const SYNCED_SETTINGS_KEYS = [
   'vc_encrypt_rooms_default',
   'vc_autoformat_json',
   'vc_pinned_rooms',
+  'vc_recent_emojis',
 ] as const
 
 let lastSyncedJson: string | null = null
