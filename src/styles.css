@@ -8436,6 +8436,40 @@ body {
 /* ---- Sidebar layout variants (data-sidenav) ---- */
 /* Default: "floating" — styles live in .app-layout / .channel-sidebar / .member-list above */
 
+/* Floating mode: the user panel detaches into its own floating glass card at
+   the bottom of the sidebar instead of sitting flush against its edges. */
+[data-sidenav="floating"] .user-panel {
+  margin: 4px 8px 8px;
+  height: 52px;
+  background: var(--glass-float);
+  border: 1px solid var(--glass-border);
+  border-radius: 14px;
+  box-shadow: var(--glass-shadow);
+}
+
+/* Align the composer with the floating user panel: both keep the same 8px
+   distance from their pane's bottom and side edges. The command palette and
+   GIF picker anchor to the area's side padding, so they follow along. */
+[data-sidenav="floating"] .message-input-area {
+  padding: 0 8px 8px;
+}
+
+/* Match the user panel's 52px height when the composer is a single line.
+   min-height (not height) so the textarea's JS autosize still grows the
+   wrap for multi-line input; flex-end alignment keeps text on the bottom. */
+[data-sidenav="floating"] .message-input-wrap {
+  min-height: 52px;
+}
+
+[data-sidenav="floating"] .command-palette {
+  left: 8px;
+  right: 8px;
+}
+
+[data-sidenav="floating"] .gif-picker {
+  left: 8px;
+}
+
 [data-sidenav="classic"] .app-layout {
   padding: 0;
   gap: 0;
