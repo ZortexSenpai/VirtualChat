@@ -57,6 +57,11 @@ const de: Record<string, string> = {
   'sidebar.decline': 'Ablehnen',
   'sidebar.unpin': 'Lösen',
   'sidebar.roomOptions': 'Raumoptionen',
+  'sidebar.createGroup': 'Gruppe erstellen',
+  'sidebar.renameGroup': 'Gruppe umbenennen',
+  'sidebar.deleteGroup': 'Gruppe löschen',
+  'sidebar.groupName': 'Gruppenname',
+  'sidebar.groupNamePlaceholder': 'z. B. Projekte',
   'sidebar.spaceSettings': 'Space-Einstellungen',
   'sidebar.noRoomsFound': 'Keine Räume gefunden.',
   'sidebar.loadingRooms': 'Räume werden geladen…',
@@ -97,6 +102,8 @@ const de: Record<string, string> = {
   'settings.sidenav.classicDesc': 'Flächen von Rand zu Rand mit Trennlinien.',
   'settings.sidenav.unified': 'Vereint',
   'settings.sidenav.unifiedDesc': 'Spaces in die Kanalleiste integriert.',
+  'settings.sidenav.modern': 'Modern',
+  'settings.sidenav.modernDesc': 'Flache Seitenleiste, Chat als schwebende Karte.',
 
   // Chat / composer
   'chat.selectRoomHeadline': 'Wähle einen Raum aus der Seitenleiste, um loszulegen',

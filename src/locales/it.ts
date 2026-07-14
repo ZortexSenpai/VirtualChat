@@ -57,6 +57,11 @@ const it: Record<string, string> = {
   'sidebar.decline': 'Rifiuta',
   'sidebar.unpin': 'Rimuovi',
   'sidebar.roomOptions': 'Opzioni stanza',
+  'sidebar.createGroup': 'Crea gruppo',
+  'sidebar.renameGroup': 'Rinomina gruppo',
+  'sidebar.deleteGroup': 'Elimina gruppo',
+  'sidebar.groupName': 'Nome del gruppo',
+  'sidebar.groupNamePlaceholder': 'es. Progetti',
   'sidebar.spaceSettings': 'Impostazioni dello spazio',
   'sidebar.noRoomsFound': 'Nessuna stanza trovata.',
   'sidebar.loadingRooms': 'Caricamento stanze…',
@@ -97,6 +102,8 @@ const it: Record<string, string> = {
   'settings.sidenav.classicDesc': 'Pannelli bordo-a-bordo con linee di separazione.',
   'settings.sidenav.unified': 'Unificato',
   'settings.sidenav.unifiedDesc': 'Spazi uniti alla barra dei canali.',
+  'settings.sidenav.modern': 'Moderno',
+  'settings.sidenav.modernDesc': 'Barra laterale piatta con la chat come scheda flottante.',
 
   // Chat / composer
   'chat.selectRoomHeadline': 'Seleziona una stanza dalla barra laterale per iniziare',

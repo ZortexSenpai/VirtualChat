@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { useMatrix } from '../context/MatrixContext'
 import { useTranslation, setLocale, LOCALES, type Locale } from '../services/i18n'
 import { DARK_THEMES, LIGHT_THEMES, getThemeMode } from '../services/themes'
+import { setSetting } from '../services/settingsSync'
 import type { StickerPack, StickerItem, KeyBackupStatus } from '../context/MatrixContext'
 import MxcAvatar, { useMxcBlobUrl } from './MxcAvatar'
 import {
@@ -515,7 +516,7 @@ function AccountTab() {
 // ---- Appearance Tab ----
 
 const LAYOUT_IDS = ['default', 'compact', 'bubble'] as const
-const SIDENAV_IDS = ['floating', 'classic', 'unified'] as const
+const SIDENAV_IDS = ['floating', 'modern', 'classic', 'unified'] as const
 
 function AppearanceTab() {
   const { t, locale } = useTranslation()
@@ -527,14 +528,14 @@ function AppearanceTab() {
 
   function applyTheme(t: string) {
     setTheme(t)
-    localStorage.setItem('vc_theme', t)
+    setSetting('vc_theme', t)
     document.documentElement.setAttribute('data-theme', t)
     document.documentElement.setAttribute('data-theme-mode', getThemeMode(t))
   }
 
   function applyFontSize(size: number) {
     setFontSize(size)
-    localStorage.setItem('vc_font_size', String(size))
+    setSetting('vc_font_size', String(size))
     document.documentElement.style.setProperty('--app-font-size', `${size}px`)
   }
 
@@ -553,7 +554,7 @@ function AppearanceTab() {
   function applyGlass(on: boolean) {
     setGlass(on)
     const v = on ? 'on' : 'off'
-    localStorage.setItem('vc_glass', v)
+    setSetting('vc_glass', v)
     document.documentElement.setAttribute('data-glass', v)
   }
 
@@ -1960,9 +1961,8 @@ function PrivacyTab() {
 
   function toggle(key: string, val: boolean, setter: (v: boolean) => void) {
     setter(val)
-    localStorage.setItem(key, String(val))
-    // Notify listeners in the same tab — the native `storage` event only fires for other tabs.
-    window.dispatchEvent(new CustomEvent('vc:settings-changed', { detail: { key } }))
+    // Writes localStorage + notifies same-tab listeners + triggers the account-data sync.
+    setSetting(key, String(val))
   }
 
   const toggleRows = [
@@ -2064,7 +2064,7 @@ function ExpertTab() {
               onClick={() => {
                 const next = !encryptByDefault
                 setEncryptByDefault(next)
-                localStorage.setItem('vc_encrypt_rooms_default', String(next))
+                setSetting('vc_encrypt_rooms_default', String(next))
               }}
             />
           </div>
@@ -2083,7 +2083,7 @@ function ExpertTab() {
               onClick={() => {
                 const next = !autoformatJson
                 setAutoformatJson(next)
-                localStorage.setItem('vc_autoformat_json', String(next))
+                setSetting('vc_autoformat_json', String(next))
               }}
             />
           </div>

@@ -30,6 +30,29 @@ import { decodeRecoveryKey } from 'matrix-js-sdk/lib/crypto-api'
 import { MatrixCall, CallEvent, CallState, CallErrorCode, CallDirection, supportsMatrixCall } from 'matrix-js-sdk/lib/webrtc/call'
 import { CallEventHandlerEvent } from 'matrix-js-sdk/lib/webrtc/callEventHandler'
 import { handleIncomingEvent, startCallRingtone, stopCallRingtone } from '../services/notifications'
+import {
+  CHANNEL_GROUPS_EVENT,
+  CHANNEL_ORDER_EVENT,
+  ChannelGroup,
+  ChannelGroupsByScope,
+  ChannelOrderByScope,
+  channelGroupScope,
+  parseChannelGroups,
+  parseChannelOrder,
+  readLocalChannelGroups,
+  readLocalChannelOrder,
+  saveLocalChannelGroups,
+  saveLocalChannelOrder,
+} from '../services/channelGroups'
+import {
+  SETTINGS_EVENT,
+  SETTINGS_CHANGED_EVENT,
+  applyRemoteSettings,
+  collectLocalSettings,
+  markSettingsSynced,
+  parseSettingsContent,
+  settingsNeedPush,
+} from '../services/settingsSync'
 
 // ---- Types ----
 
@@ -142,6 +165,8 @@ export interface MatrixState {
   syncState: SyncState | null
   spaces: Room[]
   spaceOrder: string[]
+  channelGroups: ChannelGroupsByScope
+  channelOrder: ChannelOrderByScope
   rooms: Room[]
   directRooms: Room[]
   activeSpaceId: string | null
@@ -169,6 +194,8 @@ type Action =
   | { type: 'SYNC_STATE'; state: SyncState }
   | { type: 'SET_SPACES'; spaces: Room[] }
   | { type: 'SET_SPACE_ORDER'; order: string[] }
+  | { type: 'SET_CHANNEL_GROUPS'; groups: ChannelGroupsByScope }
+  | { type: 'SET_CHANNEL_ORDER'; order: ChannelOrderByScope }
   | { type: 'SET_ROOMS'; rooms: Room[] }
   | { type: 'SET_DIRECT_ROOMS'; rooms: Room[] }
   | { type: 'SET_ACTIVE_SPACE'; spaceId: string | null }
@@ -207,6 +234,8 @@ const initialState: MatrixState = {
   syncState: null,
   spaces: [],
   spaceOrder: readLocalSpaceOrder(),
+  channelGroups: readLocalChannelGroups(),
+  channelOrder: readLocalChannelOrder(),
   rooms: [],
   directRooms: [],
   activeSpaceId: null,
@@ -238,6 +267,10 @@ function reducer(state: MatrixState, action: Action): MatrixState {
       return { ...state, spaces: action.spaces }
     case 'SET_SPACE_ORDER':
       return { ...state, spaceOrder: action.order }
+    case 'SET_CHANNEL_GROUPS':
+      return { ...state, channelGroups: action.groups }
+    case 'SET_CHANNEL_ORDER':
+      return { ...state, channelOrder: action.order }
     case 'SET_ROOMS':
       return { ...state, rooms: action.rooms }
     case 'SET_DIRECT_ROOMS':
@@ -317,6 +350,8 @@ interface MatrixContextValue {
   logout: () => Promise<void>
   setActiveSpace: (spaceId: string | null) => void
   reorderSpaces: (orderedIds: string[]) => Promise<void>
+  setChannelGroups: (spaceId: string | null, groups: ChannelGroup[]) => Promise<void>
+  setChannelOrder: (spaceId: string | null, orderedIds: string[]) => Promise<void>
   setActiveRoom: (roomId: string) => Promise<void>
   loadMoreMessages: () => Promise<void>
   sendMessage: (text: string, replyTo?: MatrixEvent | null, mentions?: MentionRef[]) => Promise<void>
@@ -528,6 +563,17 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
     activeSpaceIdRef.current = state.activeSpaceId
   }, [state.activeSpaceId])
 
+  // Ref mirrors so setChannelGroups/setChannelOrder can build the next scopes
+  // map inside a stable callback without a stale closure.
+  const channelGroupsRef = useRef<ChannelGroupsByScope>(state.channelGroups)
+  useEffect(() => {
+    channelGroupsRef.current = state.channelGroups
+  }, [state.channelGroups])
+  const channelOrderRef = useRef<ChannelOrderByScope>(state.channelOrder)
+  useEffect(() => {
+    channelOrderRef.current = state.channelOrder
+  }, [state.channelOrder])
+
   // Persist active room and space to localStorage
   useEffect(() => {
     if (state.activeRoomId) localStorage.setItem('mx_active_room', state.activeRoomId)
@@ -621,6 +667,75 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
       console.warn('Failed to persist space order to account data', err)
     }
   }, [])
+
+  const setChannelGroups = useCallback(async (spaceId: string | null, groups: ChannelGroup[]) => {
+    const scope = channelGroupScope(spaceId)
+    const next: ChannelGroupsByScope = { ...channelGroupsRef.current }
+    if (groups.length === 0) delete next[scope]
+    else next[scope] = groups
+    // Optimistic local update + localStorage fallback for offline / no-sync cases.
+    channelGroupsRef.current = next
+    dispatch({ type: 'SET_CHANNEL_GROUPS', groups: next })
+    saveLocalChannelGroups(next)
+    const client = clientRef.current
+    if (!client) return
+    try {
+      await client.setAccountData(CHANNEL_GROUPS_EVENT as any, { scopes: next } as any)
+    } catch (err) {
+      console.warn('Failed to persist channel groups to account data', err)
+    }
+  }, [])
+
+  const setChannelOrder = useCallback(async (spaceId: string | null, orderedIds: string[]) => {
+    const scope = channelGroupScope(spaceId)
+    const next: ChannelOrderByScope = { ...channelOrderRef.current }
+    if (orderedIds.length === 0) delete next[scope]
+    else next[scope] = orderedIds
+    // Optimistic local update + localStorage fallback for offline / no-sync cases.
+    channelOrderRef.current = next
+    dispatch({ type: 'SET_CHANNEL_ORDER', order: next })
+    saveLocalChannelOrder(next)
+    const client = clientRef.current
+    if (!client) return
+    try {
+      await client.setAccountData(CHANNEL_ORDER_EVENT as any, { scopes: next } as any)
+    } catch (err) {
+      console.warn('Failed to persist channel order to account data', err)
+    }
+  }, [])
+
+  // Upload the synced settings snapshot when it differs from what the server
+  // last had. Compare-based, so sync echoes and re-applied remote values are
+  // free no-ops; a failed push retries on the next change or next login.
+  const pushSettingsIfNeeded = useCallback(async () => {
+    const client = clientRef.current
+    if (!client) return
+    const local = collectLocalSettings()
+    if (!settingsNeedPush(local)) return
+    try {
+      await client.setAccountData(SETTINGS_EVENT as any, { settings: local } as any)
+      markSettingsSynced(local)
+    } catch (err) {
+      console.warn('Failed to persist settings to account data', err)
+    }
+  }, [])
+
+  // Any local settings write dispatches SETTINGS_CHANGED_EVENT; debounce a
+  // push so rapid changes (font-size slider, toggling several switches)
+  // become one account-data write.
+  useEffect(() => {
+    if (!state.isLoggedIn) return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const onChanged = () => {
+      if (timer !== null) clearTimeout(timer)
+      timer = setTimeout(() => { pushSettingsIfNeeded() }, 1000)
+    }
+    window.addEventListener(SETTINGS_CHANGED_EVENT, onChanged)
+    return () => {
+      window.removeEventListener(SETTINGS_CHANGED_EVENT, onChanged)
+      if (timer !== null) clearTimeout(timer)
+    }
+  }, [state.isLoggedIn, pushSettingsIfNeeded])
 
   const refreshRooms = useCallback(() => {
     const client = clientRef.current
@@ -790,6 +905,31 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
             dispatch({ type: 'SET_SPACE_ORDER', order: content.order as string[] })
           }
         } catch { /* ignore */ }
+        // Load saved channel groups + order from account data (syncs across devices)
+        try {
+          const groups = parseChannelGroups(client.getAccountData(CHANNEL_GROUPS_EVENT as any)?.getContent())
+          if (groups) {
+            channelGroupsRef.current = groups
+            dispatch({ type: 'SET_CHANNEL_GROUPS', groups })
+            saveLocalChannelGroups(groups)
+          }
+        } catch { /* ignore */ }
+        try {
+          const order = parseChannelOrder(client.getAccountData(CHANNEL_ORDER_EVENT as any)?.getContent())
+          if (order) {
+            channelOrderRef.current = order
+            dispatch({ type: 'SET_CHANNEL_ORDER', order })
+            saveLocalChannelOrder(order)
+          }
+        } catch { /* ignore */ }
+        // Load synced settings from account data, then push back if the local
+        // snapshot has anything the server doesn't (first run migrates the
+        // existing localStorage settings up; later runs push offline changes).
+        try {
+          const remote = parseSettingsContent(client.getAccountData(SETTINGS_EVENT as any)?.getContent())
+          if (remote) applyRemoteSettings(remote)
+          pushSettingsIfNeeded()
+        } catch { /* ignore */ }
       }
     })
 
@@ -921,6 +1061,30 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
           dispatch({ type: 'SET_SPACE_ORDER', order: content.order as string[] })
           try { localStorage.setItem('vc_space_order', JSON.stringify(content.order)) } catch { /* ignore */ }
         }
+        return
+      }
+      if (eventType === CHANNEL_GROUPS_EVENT) {
+        const groups = parseChannelGroups(event.getContent())
+        if (groups) {
+          channelGroupsRef.current = groups
+          dispatch({ type: 'SET_CHANNEL_GROUPS', groups })
+          saveLocalChannelGroups(groups)
+        }
+        return
+      }
+      if (eventType === CHANNEL_ORDER_EVENT) {
+        const order = parseChannelOrder(event.getContent())
+        if (order) {
+          channelOrderRef.current = order
+          dispatch({ type: 'SET_CHANNEL_ORDER', order })
+          saveLocalChannelOrder(order)
+        }
+        return
+      }
+      if (eventType === SETTINGS_EVENT) {
+        // Settings updated from another device (or our own echo — a no-op).
+        const remote = parseSettingsContent(event.getContent())
+        if (remote) applyRemoteSettings(remote)
         return
       }
       if (eventType === 'm.direct') {
@@ -2314,6 +2478,8 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
     logout,
     setActiveSpace,
     reorderSpaces,
+    setChannelGroups,
+    setChannelOrder,
     setActiveRoom,
     loadMoreMessages,
     sendMessage,

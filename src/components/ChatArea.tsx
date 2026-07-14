@@ -11,6 +11,7 @@ import { useImageViewer } from './ImageLightbox'
 import { isVoiceChannel } from '../services/roomKind'
 import { getRoomEmoteMap, renderEmoteString, isCustomEmoteKey, type RoomEmote } from '../services/emotes'
 import { twemojifyChildren, twemojifyString, useTwemojiEnabled } from '../services/twemoji'
+import { recordRecentEmoji, useRecentEmojis } from '../services/recentEmojis'
 import ForwardModal from './ForwardModal'
 
 // Local context so emote-aware components don't need prop-drilling.
@@ -2241,8 +2242,26 @@ function MessageActions({
     return () => { setMoreOpen(false); fn() }
   }
 
+  const recentEmojis = useRecentEmojis(3)
+
+  function handleReact(emoji: string) {
+    recordRecentEmoji(emoji)
+    onReact(emoji)
+  }
+
   return (
     <div className="message-actions">
+      {/* Quick reactions: the three most recently used emojis. */}
+      {recentEmojis.map(emoji => (
+        <button
+          key={emoji}
+          className="message-action-btn message-action-btn--emoji"
+          onClick={() => handleReact(emoji)}
+          title={`React with ${emoji}`}
+        >
+          {emoji}
+        </button>
+      ))}
       {/* Primary actions: react, reply, edit (if own). The rest collapse into "…". */}
       <button
         className="message-action-btn"
@@ -2321,7 +2340,7 @@ function MessageActions({
 
       {pickerOpen && (
         <ReactionPicker
-          onPick={onReact}
+          onPick={handleReact}
           onClose={() => setPickerOpen(false)}
         />
       )}

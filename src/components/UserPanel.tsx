@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { SetPresence } from 'matrix-js-sdk'
 import { useMatrix } from '../context/MatrixContext'
-import MxcAvatar from './MxcAvatar'
+import MxcAvatar, { useMxcBlobUrl } from './MxcAvatar'
 import SettingsModal from './SettingsModal'
 import { useTranslation } from '../services/i18n'
 
@@ -137,9 +137,17 @@ export default function UserPanel() {
     : localPresence === 'unavailable' ? 'unavailable'
     : 'offline'
 
+  // Own profile banner (MSC4133 field, loaded into state after initial sync)
+  // as the panel background — rendered via the ::before pseudo-element so the
+  // per-layout background overrides don't fight it.
+  const bannerUrl = useMxcBlobUrl(state.myBannerMxc, 600, 120)
+
   return (
     <>
-      <div className="user-panel">
+      <div
+        className={`user-panel${bannerUrl ? ' user-panel--banner' : ''}`}
+        style={bannerUrl ? { ['--user-banner' as any]: `url(${bannerUrl})` } : undefined}
+      >
         <div className="user-panel-avatar-wrap">
           <div className="user-panel-avatar">
             <MxcAvatar mxcUrl={avatarMxc} size={32} name={displayName} />

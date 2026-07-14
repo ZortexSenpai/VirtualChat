@@ -57,6 +57,11 @@ const fr: Record<string, string> = {
   'sidebar.decline': 'Refuser',
   'sidebar.unpin': 'Désépingler',
   'sidebar.roomOptions': 'Options du salon',
+  'sidebar.createGroup': 'Créer un groupe',
+  'sidebar.renameGroup': 'Renommer le groupe',
+  'sidebar.deleteGroup': 'Supprimer le groupe',
+  'sidebar.groupName': 'Nom du groupe',
+  'sidebar.groupNamePlaceholder': 'p. ex. Projets',
   'sidebar.spaceSettings': 'Paramètres de l\'espace',
   'sidebar.noRoomsFound': 'Aucun salon trouvé.',
   'sidebar.loadingRooms': 'Chargement des salons…',
@@ -97,6 +102,8 @@ const fr: Record<string, string> = {
   'settings.sidenav.classicDesc': 'Panneaux bord à bord avec lignes de séparation.',
   'settings.sidenav.unified': 'Unifié',
   'settings.sidenav.unifiedDesc': 'Espaces fusionnés avec la barre des salons.',
+  'settings.sidenav.modern': 'Moderne',
+  'settings.sidenav.modernDesc': 'Barre latérale plate, discussion en carte flottante.',
 
   // Chat / composer
   'chat.selectRoomHeadline': 'Sélectionnez un salon dans la barre latérale pour commencer',
