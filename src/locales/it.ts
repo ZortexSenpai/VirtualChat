@@ -102,6 +102,8 @@ const it: Record<string, string> = {
   'settings.sidenav.classicDesc': 'Pannelli bordo-a-bordo con linee di separazione.',
   'settings.sidenav.unified': 'Unificato',
   'settings.sidenav.unifiedDesc': 'Spazi uniti alla barra dei canali.',
+  'settings.sidenav.modern': 'Moderno',
+  'settings.sidenav.modernDesc': 'Barra laterale piatta con la chat come scheda flottante.',
 
   // Chat / composer
   'chat.selectRoomHeadline': 'Seleziona una stanza dalla barra laterale per iniziare',

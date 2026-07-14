@@ -2496,6 +2496,34 @@ body {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.06);
 }
 
+/* Profile banner as the panel background (all layouts). Painted on ::before —
+   with a theme-aware scrim over it — so the per-layout `background:`
+   shorthand overrides (floating/modern/unified) don't reset its sizing. */
+.user-panel--banner {
+  position: relative;
+}
+
+.user-panel--banner::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(
+      color-mix(in srgb, var(--glass-panel) 72%, transparent),
+      color-mix(in srgb, var(--glass-panel) 72%, transparent)
+    ),
+    var(--user-banner);
+  background-size: cover;
+  background-position: center;
+  border-radius: inherit;
+  pointer-events: none;
+}
+
+.user-panel--banner > * {
+  position: relative;
+  z-index: 1;
+}
+
 .user-panel-avatar-wrap {
   position: relative;
 }
@@ -8433,11 +8461,109 @@ body {
   border-radius: 0 4px 4px 0;
 }
 
+.settings-sidenav-preview--modern {
+  padding-left: 0;
+}
+.settings-sidenav-preview--modern .ssp-spaces,
+.settings-sidenav-preview--modern .ssp-sidebar {
+  border-radius: 0;
+  margin: -6px 0;
+  background: rgba(255, 255, 255, 0.06);
+}
+/* Chat + members render as one square, full-height panel in the thumbnail too */
+.settings-sidenav-preview--modern .ssp-chat {
+  border-radius: 0;
+  margin: -6px 0;
+}
+.settings-sidenav-preview--modern .ssp-members {
+  border-radius: 0;
+  margin: -6px 0 -6px -4px;
+  background: rgba(255, 255, 255, 0.08);
+  border-left: 1px solid rgba(255, 255, 255, 0.12);
+}
+
 /* ---- Sidebar layout variants (data-sidenav) ---- */
 /* Default: "floating" — styles live in .app-layout / .channel-sidebar / .member-list above */
 
-/* Floating mode: the user panel detaches into its own floating glass card at
-   the bottom of the sidebar instead of sitting flush against its edges. */
+/* Modern: Discord's 2025 visual refresh — space rail and channel list sit
+   flat on the base background; chat AND member list form ONE elevated
+   square-edged panel (hairline border, no drop shadow — elevation comes
+   from surface contrast) full-height with 8px side insets; the user panel
+   floats as its own card (rule further down). */
+[data-sidenav="modern"] .app-layout {
+  padding: 0;
+  gap: 0;
+}
+
+[data-sidenav="modern"] .space-bar {
+  padding: 8px 0;
+}
+
+[data-sidenav="modern"] .channel-sidebar {
+  background: transparent;
+  /* No blur on a transparent surface — and a backdrop-filter would become
+     the containing block for the fixed-position user panel below. */
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+  border: none;
+  border-radius: 0;
+  box-shadow: none;
+}
+
+[data-sidenav="modern"] .chat-area {
+  /* Full-height panel: no vertical margins, so the composer's 8px bottom
+     inset lands on the same line as the user panel's 8px bottom margin. */
+  margin: 0 8px;
+  border-radius: 0;
+}
+
+[data-sidenav="modern"] .chat-main {
+  border-radius: 0;
+  /* Full-height panel: no top/bottom borders against the window edges. */
+  border-top: none;
+  border-bottom: none;
+}
+
+[data-sidenav="modern"] .drop-overlay {
+  border-radius: 0;
+}
+
+/* Member list: right half of the shared panel — same surface as the chat,
+   its left border acting as the divider, flat elevation. */
+[data-sidenav="modern"] .member-list {
+  margin: 0;
+  border-radius: 0;
+  border-top: none;
+  border-bottom: none;
+  background: rgba(8, 9, 20, 0.45);
+  box-shadow: var(--glass-highlight);
+}
+
+[data-glass="off"][data-sidenav="modern"] .member-list {
+  background: var(--glass-panel);
+}
+
+@media (min-width: 769px) {
+  /* Join the chat panel and member list into one card. Desktop-only: on
+     mobile the member list is a fixed drawer (still a DOM sibling, so :has
+     would otherwise match). */
+  [data-sidenav="modern"] .app-layout:has(> .member-list) .chat-area {
+    margin-right: 0;
+  }
+  [data-sidenav="modern"] .app-layout:has(> .member-list) .chat-main {
+    border-right: none;
+  }
+  /* Collapse the 4px resizer strip so the seam is invisible; negative margins
+     keep it overlaying the divider as the drag target. */
+  [data-sidenav="modern"] .panel-resizer--right {
+    margin: 0 -2px;
+  }
+
+}
+
+/* Floating + modern: the user panel detaches into its own floating glass card
+   at the bottom of the sidebar instead of sitting flush against its edges. */
+[data-sidenav="modern"] .user-panel,
 [data-sidenav="floating"] .user-panel {
   margin: 4px 8px 8px;
   height: 52px;
@@ -8447,26 +8573,52 @@ body {
   box-shadow: var(--glass-shadow);
 }
 
-/* Align the composer with the floating user panel: both keep the same 8px
-   distance from their pane's bottom and side edges. The command palette and
-   GIF picker anchor to the area's side padding, so they follow along. */
-[data-sidenav="floating"] .message-input-area {
+/* Modern (desktop): pin the user panel to the bottom-left of the screen,
+   spanning the 60px space rail plus the full channel sidebar, inset 8px from
+   the screen's left/bottom edges and ending flush with the sidebar's right
+   edge. Must come after the shared rule above so its margin reset wins. */
+@media (min-width: 769px) {
+  [data-sidenav="modern"] .user-panel {
+    position: fixed;
+    left: 8px;
+    bottom: 8px;
+    width: calc(60px + var(--channel-sidebar-width, 240px) - 8px);
+    margin: 0;
+    z-index: 10;
+  }
+
+  /* The panel floats above the channel list — give the list room to scroll
+     its last entries clear of it. */
+  [data-sidenav="modern"] .channel-list {
+    padding-bottom: 68px;
+  }
+}
+
+/* Align the composer with the floating user panel (floating + modern): both
+   keep the same 8px distance from their pane's bottom and side edges. The
+   command palette and GIF picker anchor to the area's side padding, so they
+   follow along. */
+[data-sidenav="floating"] .message-input-area,
+[data-sidenav="modern"] .message-input-area {
   padding: 0 8px 8px;
 }
 
 /* Match the user panel's 52px height when the composer is a single line.
    min-height (not height) so the textarea's JS autosize still grows the
    wrap for multi-line input; flex-end alignment keeps text on the bottom. */
-[data-sidenav="floating"] .message-input-wrap {
+[data-sidenav="floating"] .message-input-wrap,
+[data-sidenav="modern"] .message-input-wrap {
   min-height: 52px;
 }
 
-[data-sidenav="floating"] .command-palette {
+[data-sidenav="floating"] .command-palette,
+[data-sidenav="modern"] .command-palette {
   left: 8px;
   right: 8px;
 }
 
-[data-sidenav="floating"] .gif-picker {
+[data-sidenav="floating"] .gif-picker,
+[data-sidenav="modern"] .gif-picker {
   left: 8px;
 }
 
@@ -11371,9 +11523,12 @@ img.twemoji,
     box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
   }
 
-  /* Neutralize sidenav-variant margin on chat-area */
+  /* Neutralize sidenav-variant card styling on chat-area (unified margin,
+     modern margins/radius/shadow) — chat is full-screen on mobile. */
   .app-layout .chat-area {
-    margin-left: 0;
+    margin: 0;
+    border-radius: 0;
+    box-shadow: none;
   }
 
   /* ---- Drawer backdrop ---- */
@@ -12020,4 +12175,15 @@ img.twemoji,
   height: 1px;
   background: rgba(255, 255, 255, 0.08);
   margin: 4px 2px;
+}
+
+/* ---- Liquid glass off: no white top-edge highlight ----
+   With blur disabled the 1px white inset reads as a hard seam instead of a
+   glass edge, so neutralize it. A fully transparent shadow (not `none`):
+   the token is used inside comma-separated shadow lists, where a literal
+   `none` would invalidate the whole declaration. Placed after every
+   :root[data-theme] token block so it wins the equal-specificity cascade. */
+:root[data-glass="off"] {
+  --glass-highlight: inset 0 1px 0 rgba(255, 255, 255, 0);
+  --glass-highlight-strong: inset 0 1px 0 rgba(255, 255, 255, 0);
 }

@@ -102,6 +102,8 @@ const de: Record<string, string> = {
   'settings.sidenav.classicDesc': 'Flächen von Rand zu Rand mit Trennlinien.',
   'settings.sidenav.unified': 'Vereint',
   'settings.sidenav.unifiedDesc': 'Spaces in die Kanalleiste integriert.',
+  'settings.sidenav.modern': 'Modern',
+  'settings.sidenav.modernDesc': 'Flache Seitenleiste, Chat als schwebende Karte.',
 
   // Chat / composer
   'chat.selectRoomHeadline': 'Wähle einen Raum aus der Seitenleiste, um loszulegen',

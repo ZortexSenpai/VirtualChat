@@ -102,6 +102,8 @@ const fr: Record<string, string> = {
   'settings.sidenav.classicDesc': 'Panneaux bord à bord avec lignes de séparation.',
   'settings.sidenav.unified': 'Unifié',
   'settings.sidenav.unifiedDesc': 'Espaces fusionnés avec la barre des salons.',
+  'settings.sidenav.modern': 'Moderne',
+  'settings.sidenav.modernDesc': 'Barre latérale plate, discussion en carte flottante.',
 
   // Chat / composer
   'chat.selectRoomHeadline': 'Sélectionnez un salon dans la barre latérale pour commencer',

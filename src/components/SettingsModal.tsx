@@ -516,7 +516,7 @@ function AccountTab() {
 // ---- Appearance Tab ----
 
 const LAYOUT_IDS = ['default', 'compact', 'bubble'] as const
-const SIDENAV_IDS = ['floating', 'classic', 'unified'] as const
+const SIDENAV_IDS = ['floating', 'modern', 'classic', 'unified'] as const
 
 function AppearanceTab() {
   const { t, locale } = useTranslation()

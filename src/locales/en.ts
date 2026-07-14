@@ -102,6 +102,8 @@ const en: Record<string, string> = {
   'settings.sidenav.classicDesc': 'Edge-to-edge panels with separator lines.',
   'settings.sidenav.unified': 'Unified',
   'settings.sidenav.unifiedDesc': 'Spaces merged into the channel sidebar.',
+  'settings.sidenav.modern': 'Modern',
+  'settings.sidenav.modernDesc': 'Flat sidebar with the chat floating as a card.',
 
   // Chat / composer
   'chat.selectRoomHeadline': 'Select a room from the sidebar to start chatting',
