@@ -44,6 +44,9 @@ export function setLocale(locale: Locale): void {
   try { localStorage.setItem(STORAGE_KEY, locale) } catch {}
   try { document.documentElement.setAttribute('lang', locale) } catch {}
   listeners.forEach(l => l())
+  // Signal the settings sync (event dispatched inline — settingsSync imports
+  // this module, so importing its helper here would create a cycle).
+  try { window.dispatchEvent(new CustomEvent('vc:settings-changed', { detail: { key: STORAGE_KEY } })) } catch {}
 }
 
 function subscribe(listener: () => void): () => void {

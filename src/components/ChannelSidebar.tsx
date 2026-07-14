@@ -18,6 +18,7 @@ import {
   readCollapsedGroups,
   saveCollapsedGroups,
 } from '../services/channelGroups'
+import { SETTINGS_CHANGED_EVENT, setSetting } from '../services/settingsSync'
 
 function VoiceChannelIcon() {
   return (
@@ -476,7 +477,7 @@ function loadPinnedRooms(): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem('vc_pinned_rooms') ?? '[]')) } catch { return new Set() }
 }
 function savePinnedRooms(ids: Set<string>) {
-  localStorage.setItem('vc_pinned_rooms', JSON.stringify([...ids]))
+  setSetting('vc_pinned_rooms', JSON.stringify([...ids]))
 }
 
 export default function ChannelSidebar() {
@@ -498,14 +499,25 @@ export default function ChannelSidebar() {
   const [dropTarget, setDropTarget] = useState<string | null>(null)
 
   function togglePin(roomId: string) {
-    setPinnedRoomIds(prev => {
-      const next = new Set(prev)
-      if (next.has(roomId)) next.delete(roomId)
-      else next.add(roomId)
-      savePinnedRooms(next)
-      return next
-    })
+    // Compute outside the updater — savePinnedRooms dispatches a window event,
+    // which must not run inside a (pure) state updater.
+    const next = new Set(pinnedRoomIds)
+    if (next.has(roomId)) next.delete(roomId)
+    else next.add(roomId)
+    savePinnedRooms(next)
+    setPinnedRoomIds(next)
   }
+
+  // Pick up pinned-room changes synced from other devices.
+  useEffect(() => {
+    const onSettingsChanged = (e: Event) => {
+      if ((e as CustomEvent).detail?.key === 'vc_pinned_rooms') {
+        setPinnedRoomIds(loadPinnedRooms())
+      }
+    }
+    window.addEventListener(SETTINGS_CHANGED_EVENT, onSettingsChanged)
+    return () => window.removeEventListener(SETTINGS_CHANGED_EVENT, onSettingsChanged)
+  }, [])
 
   // ---- Channel groups (scoped to the current space / Home view) ----
 

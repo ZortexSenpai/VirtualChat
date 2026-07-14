@@ -44,6 +44,15 @@ import {
   saveLocalChannelGroups,
   saveLocalChannelOrder,
 } from '../services/channelGroups'
+import {
+  SETTINGS_EVENT,
+  SETTINGS_CHANGED_EVENT,
+  applyRemoteSettings,
+  collectLocalSettings,
+  markSettingsSynced,
+  parseSettingsContent,
+  settingsNeedPush,
+} from '../services/settingsSync'
 
 // ---- Types ----
 
@@ -695,6 +704,39 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
     }
   }, [])
 
+  // Upload the synced settings snapshot when it differs from what the server
+  // last had. Compare-based, so sync echoes and re-applied remote values are
+  // free no-ops; a failed push retries on the next change or next login.
+  const pushSettingsIfNeeded = useCallback(async () => {
+    const client = clientRef.current
+    if (!client) return
+    const local = collectLocalSettings()
+    if (!settingsNeedPush(local)) return
+    try {
+      await client.setAccountData(SETTINGS_EVENT as any, { settings: local } as any)
+      markSettingsSynced(local)
+    } catch (err) {
+      console.warn('Failed to persist settings to account data', err)
+    }
+  }, [])
+
+  // Any local settings write dispatches SETTINGS_CHANGED_EVENT; debounce a
+  // push so rapid changes (font-size slider, toggling several switches)
+  // become one account-data write.
+  useEffect(() => {
+    if (!state.isLoggedIn) return
+    let timer: ReturnType<typeof setTimeout> | null = null
+    const onChanged = () => {
+      if (timer !== null) clearTimeout(timer)
+      timer = setTimeout(() => { pushSettingsIfNeeded() }, 1000)
+    }
+    window.addEventListener(SETTINGS_CHANGED_EVENT, onChanged)
+    return () => {
+      window.removeEventListener(SETTINGS_CHANGED_EVENT, onChanged)
+      if (timer !== null) clearTimeout(timer)
+    }
+  }, [state.isLoggedIn, pushSettingsIfNeeded])
+
   const refreshRooms = useCallback(() => {
     const client = clientRef.current
     if (!client) return
@@ -880,6 +922,14 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
             saveLocalChannelOrder(order)
           }
         } catch { /* ignore */ }
+        // Load synced settings from account data, then push back if the local
+        // snapshot has anything the server doesn't (first run migrates the
+        // existing localStorage settings up; later runs push offline changes).
+        try {
+          const remote = parseSettingsContent(client.getAccountData(SETTINGS_EVENT as any)?.getContent())
+          if (remote) applyRemoteSettings(remote)
+          pushSettingsIfNeeded()
+        } catch { /* ignore */ }
       }
     })
 
@@ -1029,6 +1079,12 @@ export function MatrixProvider({ children }: { children: React.ReactNode }) {
           dispatch({ type: 'SET_CHANNEL_ORDER', order })
           saveLocalChannelOrder(order)
         }
+        return
+      }
+      if (eventType === SETTINGS_EVENT) {
+        // Settings updated from another device (or our own echo — a no-op).
+        const remote = parseSettingsContent(event.getContent())
+        if (remote) applyRemoteSettings(remote)
         return
       }
       if (eventType === 'm.direct') {
