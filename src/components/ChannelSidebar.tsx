@@ -10,6 +10,14 @@ import SpaceLobby from './SpaceLobby'
 import { isVoiceChannel } from '../services/roomKind'
 import { getRoomAvatarMxc } from '../services/roomAvatar'
 import { useTranslation } from '../services/i18n'
+import {
+  ChannelGroup,
+  applyRoomOrder,
+  channelGroupScope,
+  newGroupId,
+  readCollapsedGroups,
+  saveCollapsedGroups,
+} from '../services/channelGroups'
 
 function VoiceChannelIcon() {
   return (
@@ -326,6 +334,10 @@ interface ContextMenuState {
   y: number
 }
 
+type DragItem =
+  | { kind: 'channel'; roomId: string }
+  | { kind: 'group'; groupId: string }
+
 function NewDMModal({ onClose }: { onClose: () => void }) {
   const { createDM, setActiveRoom, client } = useMatrix()
   const [query, setQuery] = useState('')
@@ -422,6 +434,44 @@ function NewDMModal({ onClose }: { onClose: () => void }) {
   )
 }
 
+function GroupNameModal({ title, initialName, onSubmit, onClose }: {
+  title: string
+  initialName: string
+  onSubmit: (name: string) => void
+  onClose: () => void
+}) {
+  const { t } = useTranslation()
+  const [name, setName] = useState(initialName)
+
+  function handleSubmit() {
+    const n = name.trim()
+    if (!n) return
+    onSubmit(n)
+    onClose()
+  }
+
+  return (
+    <div className="modal-overlay" onClick={e => e.target === e.currentTarget && onClose()}>
+      <div className="modal-card">
+        <h2>{title}</h2>
+        <div className="form-group">
+          <label>{t('sidebar.groupName')}</label>
+          <input type="text" value={name} onChange={e => setName(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
+            placeholder={t('sidebar.groupNamePlaceholder')} autoFocus />
+        </div>
+        <div className="modal-actions">
+          <button className="btn-secondary" onClick={onClose}>{t('common.cancel')}</button>
+          <button className="btn-primary" style={{ display: 'inline-block', width: 'auto', marginTop: 0 }}
+            onClick={handleSubmit} disabled={!name.trim()}>
+            {initialName ? t('common.save') : t('common.create')}
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function loadPinnedRooms(): Set<string> {
   try { return new Set(JSON.parse(localStorage.getItem('vc_pinned_rooms') ?? '[]')) } catch { return new Set() }
 }
@@ -431,7 +481,7 @@ function savePinnedRooms(ids: Set<string>) {
 
 export default function ChannelSidebar() {
   const { t } = useTranslation()
-  const { state, setActiveRoom, joinRoom, declineInvite } = useMatrix()
+  const { state, setActiveRoom, joinRoom, declineInvite, setChannelGroups, setChannelOrder } = useMatrix()
   const [contextMenu, setContextMenu] = useState<ContextMenuState | null>(null)
   const [settingsRoom, setSettingsRoom] = useState<Room | null>(null)
   const [showNewDM, setShowNewDM] = useState(false)
@@ -440,6 +490,12 @@ export default function ChannelSidebar() {
   const [showDirectory, setShowDirectory] = useState(false)
   const [showSpaceLobby, setShowSpaceLobby] = useState(false)
   const [pinnedRoomIds, setPinnedRoomIds] = useState<Set<string>>(loadPinnedRooms)
+  // Create/rename group modal: group=null → create (optionally moving roomId
+  // into the new group), group set → rename.
+  const [groupModal, setGroupModal] = useState<{ group: ChannelGroup | null; roomId?: string } | null>(null)
+  const [collapsedGroups, setCollapsedGroups] = useState<Set<string>>(readCollapsedGroups)
+  const [dragItem, setDragItem] = useState<DragItem | null>(null)
+  const [dropTarget, setDropTarget] = useState<string | null>(null)
 
   function togglePin(roomId: string) {
     setPinnedRoomIds(prev => {
@@ -449,6 +505,143 @@ export default function ChannelSidebar() {
       savePinnedRooms(next)
       return next
     })
+  }
+
+  // ---- Channel groups (scoped to the current space / Home view) ----
+
+  const groups = state.channelGroups[channelGroupScope(state.activeSpaceId)] ?? []
+
+  function saveGroups(next: ChannelGroup[]) {
+    setChannelGroups(state.activeSpaceId, next).catch(console.error)
+  }
+
+  function createGroup(name: string, initialRoomId?: string) {
+    const cleaned = initialRoomId
+      ? groups.map(g => ({ ...g, roomIds: g.roomIds.filter(id => id !== initialRoomId) }))
+      : groups
+    saveGroups([...cleaned, { id: newGroupId(), name, roomIds: initialRoomId ? [initialRoomId] : [] }])
+  }
+
+  function renameGroup(groupId: string, name: string) {
+    saveGroups(groups.map(g => (g.id === groupId ? { ...g, name } : g)))
+  }
+
+  function deleteGroup(groupId: string) {
+    saveGroups(groups.filter(g => g.id !== groupId))
+  }
+
+  function moveRoomToGroup(roomId: string, groupId: string | null) {
+    const cleaned = groups.map(g => ({ ...g, roomIds: g.roomIds.filter(id => id !== roomId) }))
+    saveGroups(groupId === null
+      ? cleaned
+      : cleaned.map(g => (g.id === groupId ? { ...g, roomIds: [...g.roomIds, roomId] } : g)))
+  }
+
+  function toggleGroupCollapsed(groupId: string) {
+    setCollapsedGroups(prev => {
+      const next = new Set(prev)
+      if (next.has(groupId)) next.delete(groupId)
+      else next.add(groupId)
+      saveCollapsedGroups(next)
+      return next
+    })
+  }
+
+  function reorderGroups(sourceId: string, targetId: string) {
+    const fromIdx = groups.findIndex(g => g.id === sourceId)
+    const toIdx = groups.findIndex(g => g.id === targetId)
+    if (fromIdx < 0 || toIdx < 0) return
+    const next = [...groups]
+    const [moved] = next.splice(fromIdx, 1)
+    next.splice(toIdx, 0, moved)
+    saveGroups(next)
+  }
+
+  function insertRoomInGroup(roomId: string, groupId: string, beforeRoomId: string) {
+    const cleaned = groups.map(g => ({ ...g, roomIds: g.roomIds.filter(id => id !== roomId) }))
+    saveGroups(cleaned.map(g => {
+      if (g.id !== groupId) return g
+      const roomIds = [...g.roomIds]
+      const idx = roomIds.indexOf(beforeRoomId)
+      if (idx < 0) roomIds.push(roomId)
+      else roomIds.splice(idx, 0, roomId)
+      return { ...g, roomIds }
+    }))
+  }
+
+  function saveChannelOrder(orderedIds: string[]) {
+    setChannelOrder(state.activeSpaceId, orderedIds).catch(console.error)
+  }
+
+  /**
+   * Place a channel in the ungrouped list: before beforeRoomId, or at the top
+   * when beforeRoomId is null. Also removes it from its group if needed.
+   */
+  function insertRoomInUngrouped(roomId: string, beforeRoomId: string | null) {
+    const displayed = ungroupedChannels.map(r => r.roomId)
+    const next = displayed.filter(id => id !== roomId)
+    const idx = beforeRoomId === null ? 0 : next.indexOf(beforeRoomId)
+    next.splice(idx < 0 ? next.length : idx, 0, roomId)
+    if (groupedIds.has(roomId)) moveRoomToGroup(roomId, null)
+    else if (next.every((id, i) => id === displayed[i])) return // no-op reorder
+    saveChannelOrder(next)
+  }
+
+  // ---- Drag & drop: channels into/out of groups, groups reordered ----
+
+  function clearDrag() {
+    setDragItem(null)
+    setDropTarget(null)
+  }
+
+  function handleDragStart(e: React.DragEvent, item: DragItem) {
+    setDragItem(item)
+    e.dataTransfer.effectAllowed = 'move'
+    // Firefox requires data to be set for the drag to begin
+    try { e.dataTransfer.setData('text/plain', item.kind === 'channel' ? item.roomId : item.groupId) } catch { /* ignore */ }
+  }
+
+  function handleDragOver(e: React.DragEvent, targetKey: string, accept: boolean) {
+    if (!dragItem || !accept) return
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    if (dropTarget !== targetKey) setDropTarget(targetKey)
+  }
+
+  function handleDragLeave(targetKey: string) {
+    if (dropTarget === targetKey) setDropTarget(null)
+  }
+
+  /** Channel dropped on a group header appends to it; group dropped on a group header reorders. */
+  function handleDropOnGroup(e: React.DragEvent, groupId: string) {
+    e.preventDefault()
+    const item = dragItem
+    clearDrag()
+    if (!item) return
+    if (item.kind === 'channel') moveRoomToGroup(item.roomId, groupId)
+    else if (item.groupId !== groupId) reorderGroups(item.groupId, groupId)
+  }
+
+  /** Channel dropped on another channel row: insert before it (ungrouping first if the target is ungrouped). */
+  function handleDropOnChannel(e: React.DragEvent, targetRoomId: string, targetGroupId: string | null) {
+    e.preventDefault()
+    const item = dragItem
+    clearDrag()
+    if (!item || item.kind !== 'channel' || item.roomId === targetRoomId) return
+    if (targetGroupId === null) {
+      insertRoomInUngrouped(item.roomId, targetRoomId)
+    } else {
+      insertRoomInGroup(item.roomId, targetGroupId, targetRoomId)
+    }
+  }
+
+  /** Channel dropped on the "Channels" section header: move to the top of the ungrouped list. */
+  function handleDropOnUngrouped(e: React.DragEvent) {
+    e.preventDefault()
+    const item = dragItem
+    clearDrag()
+    if (!item || item.kind !== 'channel') return
+    insertRoomInUngrouped(item.roomId, null)
   }
 
   const activeSpace = state.activeSpaceId
@@ -462,6 +655,21 @@ export default function ChannelSidebar() {
   const channels = state.rooms
   const dms = state.activeSpaceId === null ? state.directRooms : []
 
+  // Partition channels into user-defined groups. Rooms referenced by a group
+  // but no longer in the channel list (left/moved) are simply not rendered;
+  // channels in no group render directly under the "Channels" header, in the
+  // user's saved order (drag-reorderable).
+  const channelById = new Map(channels.map(r => [r.roomId, r]))
+  const groupedIds = new Set(groups.flatMap(g => g.roomIds))
+  const channelOrder = state.channelOrder[channelGroupScope(state.activeSpaceId)] ?? []
+  const ungroupedChannels = applyRoomOrder(channels.filter(r => !groupedIds.has(r.roomId)), channelOrder)
+  const groupSections = groups.map(group => ({
+    group,
+    rooms: group.roomIds
+      .map(id => channelById.get(id))
+      .filter((r): r is Room => Boolean(r)),
+  }))
+
   function openContextMenu(e: React.MouseEvent, room: Room) {
     e.preventDefault()
     e.stopPropagation()
@@ -473,6 +681,46 @@ export default function ChannelSidebar() {
     e.stopPropagation()
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     setContextMenu({ room, x: rect.right + 4, y: rect.top })
+  }
+
+  // Shared row markup for grouped (groupId set) and ungrouped channels.
+  function renderChannelRow(room: Room, groupId: string | null = null) {
+    const isActive = state.activeRoomId === room.roomId
+    const name = room.name || room.roomId
+    const highlights = room.getUnreadNotificationCount(NotificationCountType.Highlight)
+    const total = room.getUnreadNotificationCount(NotificationCountType.Total)
+    const dropKey = `chan:${room.roomId}`
+    const isDragging = dragItem?.kind === 'channel' && dragItem.roomId === room.roomId
+    const isDropTarget = dropTarget === dropKey && !isDragging
+    return (
+      <div
+        key={room.roomId}
+        className={`channel-item${isActive ? ' active' : ''}${total > 0 && !isActive ? ' has-unread' : ''}${isVoiceChannel(room) ? ' channel-item--voice' : ''}${groupId ? ' channel-item--grouped' : ''}${isDragging ? ' dragging' : ''}${isDropTarget ? ' drop-target' : ''}`}
+        onClick={() => setActiveRoom(room.roomId)}
+        onContextMenu={e => openContextMenu(e, room)}
+        title={room.getLiveTimeline().getState(Direction.Forward)
+          ?.getStateEvents('m.room.topic', '')
+          ?.getContent()?.topic ?? ''}
+        draggable
+        onDragStart={e => handleDragStart(e, { kind: 'channel', roomId: room.roomId })}
+        onDragOver={e => handleDragOver(e, dropKey, dragItem?.kind === 'channel' && dragItem.roomId !== room.roomId)}
+        onDragLeave={() => handleDragLeave(dropKey)}
+        onDrop={e => handleDropOnChannel(e, room.roomId, groupId)}
+        onDragEnd={clearDrag}
+      >
+        <ChannelGlyph room={room} />
+        <span className="channel-name">{name}</span>
+        {highlights > 0 && !isActive && <span className="unread-badge unread-badge--highlight">{highlights > 99 ? '99+' : highlights}</span>}
+        {highlights === 0 && total > 0 && !isActive && <span className="unread-badge unread-badge--total">{total > 99 ? '99+' : total}</span>}
+        <button
+          className="channel-more-btn"
+          onClick={e => openMoreMenu(e, room)}
+          title={t('sidebar.roomOptions')}
+        >
+          <DotsIcon />
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -584,9 +832,14 @@ export default function ChannelSidebar() {
             </>
           ) : (
             <>
-              {channels.length > 0 && (
+              {(channels.length > 0 || groups.length > 0) && (
                 <>
-                  <div className="channel-section-header">
+                  <div
+                    className={`channel-section-header${dropTarget === 'header:channels' ? ' drop-into' : ''}`}
+                    onDragOver={e => handleDragOver(e, 'header:channels', dragItem?.kind === 'channel')}
+                    onDragLeave={() => handleDragLeave('header:channels')}
+                    onDrop={handleDropOnUngrouped}
+                  >
                     {t('sidebar.channels')}
                     {state.activeSpaceId !== null && (
                       <button className="channel-section-add-btn" onClick={() => setShowSpaceLobby(true)} title="Browse channels in this space"><ExploreIcon /></button>
@@ -596,33 +849,59 @@ export default function ChannelSidebar() {
                     )}
                     <button className="channel-section-add-btn" onClick={() => setShowJoinRoom(true)} title={t('sidebar.joinByAddress')}><JoinIcon /></button>
                     <button className="channel-section-add-btn" onClick={() => setShowCreateRoom(true)} title={t('sidebar.createRoom')}><PlusIcon /></button>
+                    <button className="channel-section-add-btn" onClick={() => setGroupModal({ group: null })} title={t('sidebar.createGroup')}><FolderPlusIcon /></button>
                   </div>
-                  {channels.map(room => {
-                    const isActive = state.activeRoomId === room.roomId
-                    const name = room.name || room.roomId
-                    const highlights = room.getUnreadNotificationCount(NotificationCountType.Highlight)
-                    const total = room.getUnreadNotificationCount(NotificationCountType.Total)
+                  {ungroupedChannels.map(room => renderChannelRow(room))}
+                  {groupSections.map(({ group, rooms }) => {
+                    const collapsed = collapsedGroups.has(group.id)
+                    // Collapsed groups still surface the active channel and
+                    // anything unread, so nothing important disappears.
+                    const visibleRooms = collapsed
+                      ? rooms.filter(r =>
+                          r.roomId === state.activeRoomId
+                          || r.getUnreadNotificationCount(NotificationCountType.Total) > 0)
+                      : rooms
+                    const headerKey = `grp:${group.id}`
+                    const isGroupDragging = dragItem?.kind === 'group' && dragItem.groupId === group.id
+                    const isHeaderTarget = dropTarget === headerKey && !isGroupDragging
+                    const headerCls = [
+                      'channel-group-header',
+                      collapsed ? 'collapsed' : '',
+                      isGroupDragging ? 'dragging' : '',
+                      // A dragged group shows an insertion bar; a dragged channel highlights the whole header.
+                      isHeaderTarget ? (dragItem?.kind === 'group' ? 'drop-target' : 'drop-into') : '',
+                    ].filter(Boolean).join(' ')
                     return (
-                      <div
-                        key={room.roomId}
-                        className={`channel-item${isActive ? ' active' : ''}${total > 0 && !isActive ? ' has-unread' : ''}${isVoiceChannel(room) ? ' channel-item--voice' : ''}`}
-                        onClick={() => setActiveRoom(room.roomId)}
-                        onContextMenu={e => openContextMenu(e, room)}
-                        title={room.getLiveTimeline().getState(Direction.Forward)
-                          ?.getStateEvents('m.room.topic', '')
-                          ?.getContent()?.topic ?? ''}
-                      >
-                        <ChannelGlyph room={room} />
-                        <span className="channel-name">{name}</span>
-                        {highlights > 0 && !isActive && <span className="unread-badge unread-badge--highlight">{highlights > 99 ? '99+' : highlights}</span>}
-                        {highlights === 0 && total > 0 && !isActive && <span className="unread-badge unread-badge--total">{total > 99 ? '99+' : total}</span>}
-                        <button
-                          className="channel-more-btn"
-                          onClick={e => openMoreMenu(e, room)}
-                          title={t('sidebar.roomOptions')}
+                      <div key={group.id} className="channel-group">
+                        <div
+                          className={headerCls}
+                          onClick={() => toggleGroupCollapsed(group.id)}
+                          draggable
+                          onDragStart={e => handleDragStart(e, { kind: 'group', groupId: group.id })}
+                          onDragOver={e => handleDragOver(e, headerKey,
+                            dragItem?.kind === 'channel' || (dragItem?.kind === 'group' && dragItem.groupId !== group.id))}
+                          onDragLeave={() => handleDragLeave(headerKey)}
+                          onDrop={e => handleDropOnGroup(e, group.id)}
+                          onDragEnd={clearDrag}
                         >
-                          <DotsIcon />
-                        </button>
+                          <ChevronIcon />
+                          <span className="channel-group-name">{group.name}</span>
+                          <button
+                            className="channel-section-add-btn"
+                            onClick={e => { e.stopPropagation(); setGroupModal({ group }) }}
+                            title={t('sidebar.renameGroup')}
+                          >
+                            <PencilIcon />
+                          </button>
+                          <button
+                            className="channel-section-add-btn"
+                            onClick={e => { e.stopPropagation(); deleteGroup(group.id) }}
+                            title={t('sidebar.deleteGroup')}
+                          >
+                            <TrashIcon />
+                          </button>
+                        </div>
+                        {visibleRooms.map(room => renderChannelRow(room, group.id))}
                       </div>
                     )
                   })}
@@ -693,6 +972,23 @@ export default function ChannelSidebar() {
           }}
           isPinned={pinnedRoomIds.has(contextMenu.room.roomId)}
           onTogglePin={() => togglePin(contextMenu.room.roomId)}
+          // Grouping only applies to channels, not DMs.
+          groups={channelById.has(contextMenu.room.roomId) ? groups : null}
+          currentGroupId={groups.find(g => g.roomIds.includes(contextMenu.room.roomId))?.id ?? null}
+          onMoveToGroup={groupId => moveRoomToGroup(contextMenu.room.roomId, groupId)}
+          onCreateGroup={() => setGroupModal({ group: null, roomId: contextMenu.room.roomId })}
+        />
+      )}
+
+      {groupModal && (
+        <GroupNameModal
+          title={groupModal.group ? t('sidebar.renameGroup') : t('sidebar.createGroup')}
+          initialName={groupModal.group?.name ?? ''}
+          onSubmit={name => {
+            if (groupModal.group) renameGroup(groupModal.group.id, name)
+            else createGroup(name, groupModal.roomId)
+          }}
+          onClose={() => setGroupModal(null)}
         />
       )}
 
@@ -748,6 +1044,41 @@ function ExploreIcon() {
     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
       <circle cx="12" cy="12" r="10" />
       <polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76" />
+    </svg>
+  )
+}
+
+function FolderPlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+      <line x1="12" y1="11" x2="12" y2="17" />
+      <line x1="9" y1="14" x2="15" y2="14" />
+    </svg>
+  )
+}
+
+function ChevronIcon() {
+  return (
+    <svg className="channel-group-chevron" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="6 9 12 15 18 9" />
+    </svg>
+  )
+}
+
+function PencilIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M17 3a2.828 2.828 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5L17 3z" />
+    </svg>
+  )
+}
+
+function TrashIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="3 6 5 6 21 6" />
+      <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
     </svg>
   )
 }

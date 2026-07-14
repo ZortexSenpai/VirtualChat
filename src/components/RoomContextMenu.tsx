@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Room } from 'matrix-js-sdk'
 import { useMatrix } from '../context/MatrixContext'
+import { ChannelGroup } from '../services/channelGroups'
 
 interface Props {
   room: Room
@@ -10,22 +11,30 @@ interface Props {
   onOpenSettings: () => void
   isPinned: boolean
   onTogglePin: () => void
+  /** Channel groups for the current view; null hides the group section (e.g. DMs). */
+  groups?: ChannelGroup[] | null
+  currentGroupId?: string | null
+  onMoveToGroup?: (groupId: string | null) => void
+  onCreateGroup?: () => void
 }
 
 type NotifLevel = 'all' | 'mentions' | 'mute'
 
-export default function RoomContextMenu({ room, x, y, onClose, onOpenSettings, isPinned, onTogglePin }: Props) {
+export default function RoomContextMenu({ room, x, y, onClose, onOpenSettings, isPinned, onTogglePin, groups, currentGroupId, onMoveToGroup, onCreateGroup }: Props) {
   const { client } = useMatrix()
   const menuRef = useRef<HTMLDivElement>(null)
   const [confirmLeave, setConfirmLeave] = useState(false)
   const [copied, setCopied] = useState<'link' | 'id' | null>(null)
   const [notif, setNotif] = useState<NotifLevel>('mentions')
 
+  const showGroups = Boolean(groups && onMoveToGroup)
+
   // Clamp to viewport
   const menuW = 224
-  const menuH = 330
+  const menuH = 330 + (showGroups ? (groups!.length + 2) * 32 + 30 : 0)
   const ax = Math.min(x, window.innerWidth - menuW - 8)
-  const ay = Math.min(y, window.innerHeight - menuH - 8)
+  // Keep taller menus (many groups) from being pushed off the top of the viewport.
+  const ay = Math.max(8, Math.min(y, window.innerHeight - menuH - 8))
 
   // Read current notification level
   useEffect(() => {
@@ -166,6 +175,35 @@ export default function RoomContextMenu({ room, x, y, onClose, onOpenSettings, i
             <PinIcon /> {isPinned ? 'Unpin room' : 'Pin room'}
           </button>
 
+          {showGroups && (
+            <>
+              <div className="room-ctx-sep" />
+              <div className="room-ctx-group-label">Group</div>
+              <button
+                className={`room-ctx-item room-ctx-item--radio${!currentGroupId ? ' active' : ''}`}
+                onClick={() => { onMoveToGroup!(null); onClose() }}
+              >
+                <span className="room-ctx-radio-dot" />
+                No group
+              </button>
+              {groups!.map(g => (
+                <button
+                  key={g.id}
+                  className={`room-ctx-item room-ctx-item--radio${currentGroupId === g.id ? ' active' : ''}`}
+                  onClick={() => { onMoveToGroup!(g.id); onClose() }}
+                >
+                  <span className="room-ctx-radio-dot" />
+                  <span className="room-ctx-ellipsis">{g.name}</span>
+                </button>
+              ))}
+              {onCreateGroup && (
+                <button className="room-ctx-item" onClick={() => { onCreateGroup(); onClose() }}>
+                  <FolderPlusIcon /> New group…
+                </button>
+              )}
+            </>
+          )}
+
           <div className="room-ctx-sep" />
 
           <button className="room-ctx-item room-ctx-item--danger" onClick={() => setConfirmLeave(true)}>
@@ -218,6 +256,16 @@ function LeaveIcon() {
       <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4" />
       <polyline points="16 17 21 12 16 7" />
       <line x1="21" y1="12" x2="9" y2="12" />
+    </svg>
+  )
+}
+
+function FolderPlusIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z" />
+      <line x1="12" y1="11" x2="12" y2="17" />
+      <line x1="9" y1="14" x2="15" y2="14" />
     </svg>
   )
 }
